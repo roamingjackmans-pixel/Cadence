@@ -4,6 +4,7 @@ import { WEAPONS, WEAPON_ORDER, STATS, STAT_ORDER, BOSS, UPGRADE_MAX, upgradeCos
 import { input, btn } from './input.js';
 import { audioInit, sfx, playMusic, updateMusic, muffle, toggleMute, isMuted, suspendAudio } from './audio.js';
 import { World } from './world.js';
+import { Tutorial } from './tutorial.js';
 import { BossFight } from './boss.js';
 import { Menus } from './ui.js';
 
@@ -29,7 +30,7 @@ const game = {
   get menuOpen() { return this.menus.open || this.paused || this.scene === 'title'; },
   persist() { try { localStorage.setItem(KEY, JSON.stringify(this.save)); this.hasSave = true; } catch (e) { /* storage blocked: play on */ } },
 
-  newGame() { this.save = freshSave(); this.persist(); this.enterWorld(); this.world.areaName = { s: 'The Verdant Circuit', t0: 0.3 }; },
+  newGame() { this.save = freshSave(); this.persist(); this.enterWorld(); this.world.areaName = { s: 'The Verdant Circuit', t0: 0.3 }; this.world.tut = new Tutorial(this.world); },
   enterWorld() {
     this.menus.hideTitle(); this.menus.hide();
     this.world = new World(this);
@@ -150,6 +151,7 @@ const game = {
     this.menu(`<h2>PAUSED</h2><div class="mlist">
       <button class="mbtn" data-act="resume">Resume</button>
       <button class="mbtn" data-act="controls">Controls</button>
+      ${this.world && this.world.tut ? '<button class="mbtn" data-act="skiptut">Skip tutorial</button>' : ''}
       <button class="mbtn" data-act="hints">Answer hints <small>${s.hints ? 'on' : 'off'}</small></button>
       <button class="mbtn" data-act="quality">Resolution <small>${settings.quality}</small></button>
       <button class="mbtn" data-act="mute">Sound <small>${isMuted() ? 'off' : 'on'}</small></button>
@@ -157,6 +159,7 @@ const game = {
     {
       resume: () => this.pause(false),
       controls: () => controlsMenu(() => this.pause(true)),
+      skiptut: () => { if (this.world.tut) this.world.tut.end(); this.pause(false); },
       hints: () => { s.hints = !s.hints; this.persist(); this.pause(true); },
       quality: () => { settings.quality = { auto: 'high', high: 'low', low: 'auto' }[settings.quality]; saveSettings(); applyQuality(true); this.pause(true); },
       mute: () => { toggleMute(); this.pause(true); },
@@ -171,7 +174,7 @@ function controlsMenu(back) {
     <div class="keys">
       <span></span><b>KEYBOARD</b><b>GAMEPAD</b>
       <span>Move · aim</span><span>A / D</span><span>Left stick</span>
-      <span>Jump</span><span>W · Space</span><span>RT</span>
+      <span>Jump</span><span>W · Space</span><span>A</span>
       <span>Duck</span><span>S</span><span>RB</span>
       <span>Block</span><span>J</span><span>LB</span>
       <span>Step aside</span><span>L · Shift</span><span>LT</span>

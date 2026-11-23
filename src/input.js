@@ -11,7 +11,8 @@ const KEYS = {
 /* menu navigation reads these too */
 const NAV = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', Enter: 'confirm', Space: 'confirm', KeyE: 'confirm', KeyJ: 'confirm', Escape: 'back', Backspace: 'back', KeyK: 'back' };
 /* standard gamepad mapping */
-const PAD = { 4: 'block', 5: 'duck', 7: 'jump', 6: 'dodge', 2: 'attack', 3: 'heal', 0: 'interact', 9: 'pause', 8: 'hints' };
+// combat sits on LT step, LB block, RB duck, A jump, X strike (owner); A also interacts when nothing is attacking you
+const PAD = { 4: 'block', 5: 'duck', 6: 'dodge', 0: 'padA', 2: 'attack', 3: 'heal', 9: 'pause', 8: 'hints' };
 const PADNAV = { 12: 'up', 13: 'down', 14: 'left', 15: 'right', 0: 'confirm', 1: 'back', 9: 'back' };
 
 export const input = {
@@ -81,7 +82,7 @@ window.addEventListener('blur', () => { input.keys.clear(); });
 /** Button names for prompts, following the last device used. */
 export function btn(a) {
   const pad = input.device === 'pad';
-  const P = { block: 'LB', duck: 'RB', jump: 'RT', dodge: 'LT', attack: 'X', heal: 'Y', interact: 'A', pause: 'START' };
+  const P = { block: 'LB', duck: 'RB', jump: 'A', dodge: 'LT', attack: 'X', heal: 'Y', interact: 'A', pause: 'START' };
   const K = { block: 'J', duck: 'S', jump: 'W', dodge: 'L', attack: 'K', heal: 'H', interact: 'E', pause: 'ESC' };
   return (pad ? P : K)[a] || a;
 }

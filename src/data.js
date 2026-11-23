@@ -73,23 +73,23 @@ export const maxHP = (s) => 90 + (s.vit - BASE_STAT) * 9;
 export const ENEMIES = {
   sentinel: {
     name: 'Grid Sentinel', hp: 60, poise: 45, dmg: 12, slamDmg: 17, beat: 0.6, open: 0.95, rest: [0.7, 1.3],
-    phrases: ['R', 'Y', 'P', 'RY', 'YR', 'RP', 'R-R', 'PY', 'YRY'], reach: 96, engage: 78, speed: 95, h: 64, w: 22, echoes: 45,
+    phrases: ['R', 'Y', 'P', 'RY', 'YR', 'RP', 'R-R', 'PY', 'YRY'], reach: 96, engage: 78, speed: 95, h: 62, w: 22, echoes: 45,
     blade: 58, look: 'blade',
   },
   shardling: {
     name: 'Shardling', hp: 38, poise: 30, dmg: 8, slamDmg: 12, beat: 0.46, open: 0.8, rest: [0.6, 1.0],
-    phrases: ['Yy', 'RY', 'Yr', 'YyR', 'RyY', 'P'], reach: 80, engage: 62, speed: 150, h: 42, w: 20, echoes: 30,
+    phrases: ['Yy', 'RY', 'Yr', 'YyR', 'RyY', 'P'], reach: 80, engage: 62, speed: 150, h: 60, w: 20, echoes: 30,
     blade: 34, look: 'claw',
   },
   duelist: {
     name: 'Mirror Duelist', hp: 92, poise: 62, dmg: 14, slamDmg: 20, beat: 0.5, open: 0.85, rest: [0.6, 1.1],
-    phrases: ['Rr', 'Yy', 'RyP', 'PrY', 'RrY', 'YyR', 'R-Pp', 'RYrY'], reach: 98, engage: 80, speed: 115, h: 64, w: 20, echoes: 95,
+    phrases: ['Rr', 'Yy', 'RyP', 'PrY', 'RrY', 'YyR', 'R-Pp', 'RYrY'], reach: 98, engage: 80, speed: 115, h: 62, w: 20, echoes: 95,
     blade: 64, look: 'rapier',
   },
   hammer: {
     name: 'Hammerframe', hp: 170, poise: 95, dmg: 18, slamDmg: 27, beat: 0.72, open: 1.1, rest: [0.9, 1.5],
-    phrases: ['P', 'PP', 'YP', 'P-Pp', 'RYP', 'PyR', 'YP-P'], reach: 112, engage: 92, speed: 62, h: 86, w: 34, echoes: 160,
-    blade: 80, look: 'hammer',
+    phrases: ['P', 'PP', 'YP', 'P-Pp', 'RYP', 'PyR', 'YP-P'], reach: 112, engage: 92, speed: 62, h: 64, w: 28, echoes: 160,
+    blade: 108, look: 'hammer',
   },
 };
 

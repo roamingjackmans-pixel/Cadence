@@ -140,7 +140,8 @@ export class BossFight {
   press(a, t) {
     const p = this.player;
     if (a === 'hints') { this.g.save.hints = !this.g.save.hints; return; }
-    if (this.mode === 'intro') { if (a === 'interact' || a === 'attack') this.skipIntro = true; return; }
+    if (this.mode === 'intro') { if (a === 'interact' || a === 'padA' || a === 'attack') this.skipIntro = true; return; }
+    if (a === 'padA') a = 'jump';
     if (this.mode === 'over' || t < p.stunUntil) return;
     if (a === 'attack') { this.attack(); return; }
     if (a === 'heal') { this.heal(); return; }

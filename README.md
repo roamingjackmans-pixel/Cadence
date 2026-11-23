@@ -21,7 +21,7 @@ The first area, the Verdant Circuit, ends in a third-person duel with the Twin D
 | | Keyboard | Gamepad |
 | :- | :- | :- |
 | Move, aim | A / D | left stick |
-| Jump | W, Space | RT |
+| Jump | W, Space | A |
 | Duck | S | RB |
 | Block | J | LB |
 | Step aside | L, Shift | LT |

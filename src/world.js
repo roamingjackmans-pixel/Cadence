@@ -15,6 +15,7 @@ const txt = (s, x, y, size, c, align, weight) => txtC(CTX, s, x, y, size, c, ali
 
 const VW = W / Z, VH = H / Z;
 const RUN = 255, JV = 780, GRAV = 2600, MAXFALL = 1100, STEP = 1 / 120;
+const wrap = (s, n) => { const out = []; let cur = ''; for (const w of s.split(' ')) { if (cur && (cur + ' ' + w).length > n) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; } if (cur) out.push(cur); return out; };
 const PLAYER_C = '#5ff3ff', PLAYER_RGB = '95,243,255';
 const ENEMY_C = '#e9fbff', ENEMY_RGB = '233,251,255';
 const CLASH_Y = { slash: 40, sweep: 10, slam: 62 };
@@ -45,6 +46,7 @@ export class World {
   /** Puts the player at a beacon (or the start), refills, and brings every enemy back. */
   spawn(beaconId, refill = true) {
     const s = this.g.save, b = this.L.beacons.find((x) => x.id === beaconId) || this.L.start;
+    if (this.tut && b.id !== 'b1') this.tut.end();
     this.cond = new Conductor();
     this.fx.clear();
     this.enemies = this.L.enemies.map((d) => this.makeEnemy(d));
@@ -56,13 +58,13 @@ export class World {
       heal: null, focusUntil: 0, riposteUntil: 0, dead: false, deadT: 0, lastLand: 0, ghostT: 0, walkPh: 0, rest: false,
     };
     if (refill) s.flasks = s.flasksMax;
-    this.t = 0;
+    this.t = 0; this.grade = null; this.areaName = null;   // the clock restarts, so anything timed by it goes too
     this.cam.x = this.p.x - VW / 2; this.cam.y = this.p.y - VH * 0.6;
     this.clampCam();
     this.art.warm(this.p.x, this.p.y);
   }
   makeEnemy(d) {
-    const def = ENEMIES[d.type];
+    const def = d.def || ENEMIES[d.type];
     return {
       d, def, type: d.type, x: d.x, y: d.y, vx: 0, vy: 0, onGround: true, face: -1, hp: def.hp, poise: 0, lastPoise: -9,
       state: d.ambush ? 'perched' : 'idle', slot: 0, nextPlan: 0, openStart: -9, openEnd: -9, brokenUntil: 0, dead: false,
@@ -111,18 +113,21 @@ export class World {
     if (this.autoplay) this.auto();
     // poise recovers
     if (t >= p.stunUntil) p.poise = Math.max(0, p.poise - (this.attackers().length ? 9 : 22) * dt);
+    if (this.tut) this.tut.step(dt);
     this.cond.prune(t);
     this.checkPickups();
     this.regionBanner();
   }
 
   /* ---------- player ---------- */
-  press(a, t) {
+  press(a, t, from) {
     const p = this.p, s = this.g.save;
     if (p.dead || this.cut || p.rest) return;
     if (a === 'hints') { s.hints = !s.hints; this.g.persist(); return; }
     if (t < p.stunUntil) return;
-    if (a === 'interact') { if (!this.interact() && input.device === 'pad') this.press('jump', t); return; }
+    if (a === 'interact') { this.interact(); return; }
+    // the pad's A: interact when nothing is attacking you and there is something to use, otherwise jump
+    if (a === 'padA') { if (this.attackers().length || !this.interact()) this.press('jump', t, 'padA'); return; }
     if (a === 'heal') { this.startHeal(); return; }
     if (a === 'attack') { this.startAttack(); return; }
     if (a !== 'block' && a !== 'jump' && a !== 'duck' && a !== 'dodge') return;
@@ -145,7 +150,7 @@ export class World {
       if (!tg) p.lockUntil = t + 0.2;   // spamming the guard leaves you open
     } else if (a === 'jump') {
       if (input.held('duck') && this.onPlatform()) { p.y += 3; p.dropUntil = this.t + 0.2; p.onGround = false; return; }
-      p.vy = -JV; p.onGround = false; p.coyote = 0; p.jumpHeld = true; p.move = null; p.guardUntil = -9; sfx('jump');
+      p.vy = -JV; p.onGround = false; p.coyote = 0; p.jumpHeld = true; p.jumpKey = from === 'padA' ? 'padA' : 'jump'; p.move = null; p.guardUntil = -9; sfx('jump');
     } else {
       p.move = { kind: a, t0: this.t, until: this.t + DUR[a] };
       p.guardUntil = -9;
@@ -187,7 +192,7 @@ export class World {
     p.vx += (target - p.vx) * Math.min(1, dt * (p.onGround ? 18 : 7));
     if (ax && !p.atk && t >= p.stunUntil) p.face = sign(ax);
     // variable jump height
-    if (p.jumpHeld && !input.held('jump') && p.vy < -260) { p.vy *= 0.55; p.jumpHeld = false; }
+    if (p.jumpHeld && !input.held(p.jumpKey || 'jump') && p.vy < -260) { p.vy *= 0.55; p.jumpHeld = false; }
     const wasGround = p.onGround;
     this.physics(p, dt, true);
     if (p.onGround) { p.coyote = 0.08; if (this.tileAt(p.x - 8, p.y + 2) && this.tileAt(p.x + 8, p.y + 2)) { p.safeX = p.x; p.safeY = p.y; } } else p.coyote -= dt;
@@ -315,7 +320,7 @@ export class World {
     // plan the next phrase
     if (e.slot && t >= e.nextPlan && !this.cond.notes.some((n) => n.owner === e && !n.applied) && dist < def.engage + 60 && Math.abs(dy) < 50 && !this.p.dead) {
       const twoOn = this.attackers().length > 1;
-      let phrases = def.phrases;
+      let phrases = e.force ? [e.force] : def.phrases;   // the tutorial's echo plays one phrase on repeat
       if (twoOn) phrases = phrases.filter((x) => x.replace(/-/g, '').length <= 2);
       const ph = pick(phrases.length ? phrases : def.phrases);
       const notes = this.cond.plan(e, ph, def.beat, t + 1.05, t, {
@@ -730,16 +735,25 @@ export class World {
 
   drawPlayer(ctx) {
     const p = this.p, t = this.t, w = p.weapon;
-    const depth = p.move && p.move.kind === 'dodge' && t < p.move.until ? Math.sin(clamp((t - p.move.t0) / DUR.dodge, 0, 1) * Math.PI) : 0;
+    const lean = p.move && p.move.kind === 'dodge' && t < p.move.until ? Math.sin(clamp((t - p.move.t0) / DUR.dodge, 0, 1) * Math.PI) : 0;
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 1, 18, 4, 0, 0, 6.283); ctx.fill();
     if (t - p.ghostT < 0.3) {
       const a = 1 - (t - p.ghostT) / 0.3;
       drawFigure(ctx, { pose: p.pose, x: p.x - p.face * 16, y: p.y, s: 0.62, face: p.face, color: PLAYER_C, rgb: PLAYER_RGB, alpha: 0.3 * a, weapon: w });
     }
+    // the lean leaves a bullet-time trail: faint copies of the body between upright and the arch
+    if (lean > 0.05) {
+      const g = this.leanGhost || (this.leanGhost = copyPose(POSES.idle));
+      for (const k of [0.35, 0.65]) {
+        for (const key in g) g[key] = POSES.idle[key];
+        lerpPose(g, p.pose, k);
+        drawFigure(ctx, { pose: g, x: p.x, y: p.y, s: 0.62, face: p.face, color: PLAYER_C, rgb: PLAYER_RGB, alpha: 0.22 * lean * k, weapon: w });
+      }
+    }
     const guard = t < p.guardUntil, hot = t < p.riposteUntil ? 0.8 : guard ? 0.4 : 0;
     drawFigure(ctx, {
-      pose: p.pose, x: p.x, y: p.y - depth * 16, s: 0.62 * (1 - depth * 0.14), face: p.face, color: PLAYER_C, rgb: PLAYER_RGB, alpha: (p.dead ? 0.6 : 1) * (1 - depth * 0.45),
+      pose: p.pose, x: p.x, y: p.y, s: 0.62, face: p.face, color: PLAYER_C, rgb: PLAYER_RGB, alpha: p.dead ? 0.6 : 1,
       weapon: w, hot, blade: t < p.riposteUntil ? '#ffffff' : '#dffcff', bladeGlow: t < p.focusUntil ? 0.45 : 0.25,
     });
     if (t < p.focusUntil) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35; ctx.drawImage(glowSprite(PLAYER_C), p.x - 50, p.y - 90, 100, 100); ctx.restore(); }
@@ -833,15 +847,31 @@ export class World {
     txt(String(s.echoes), W - 40, H - 30, 22, '#eafff3', 'right');
     txt('ECHOES', W - 40, H - 12, 10, NEON2, 'right');
     if (s.hints) txt('I  hints on', W - 40, 30, 10, 'rgba(223,251,234,.4)', 'right');
+    // the tutorial's lesson
+    const tp = this.tut && !this.cut && this.tut.panel();
+    if (tp) {
+      const lines = wrap(tp.line, 74), y0 = 150, hgt = 58 + lines.length * 20 + (tp.need ? 16 : 0);
+      ctx.globalAlpha = 1 - tp.fade * 0.6;
+      ctx.fillStyle = 'rgba(2,12,8,.78)'; ctx.fillRect(W / 2 - 330, y0, 660, hgt);
+      ctx.fillStyle = tp.color; ctx.fillRect(W / 2 - 330, y0, 660, 2);
+      txt('TUTORIAL ' + tp.n + ' / ' + tp.of, W / 2 + 318, y0 + 18, 10, 'rgba(223,251,234,.45)', 'right');
+      txt(tp.title, W / 2, y0 + 30, 20, tp.color);
+      lines.forEach((l, i) => txt(l, W / 2, y0 + 56 + i * 20, 14, '#eafff3', 'center', 500));
+      for (let i = 0; i < tp.need; i++) {
+        ctx.fillStyle = i < tp.ok ? tp.color : 'rgba(223,251,234,.2)';
+        ctx.beginPath(); ctx.arc(W / 2 + (i - (tp.need - 1) / 2) * 18, y0 + hgt - 14, 5, 0, 6.283); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
     // grade
     if (this.grade) {
       const age = this.t - this.grade.t0;
-      if (age < 0.7) { ctx.globalAlpha = age < 0.45 ? 1 : 1 - (age - 0.45) / 0.25; txt(this.grade.s, W / 2, H - 150 - age * 16, 26 * (1 + 0.35 * Math.max(0, 1 - age * 9)), this.grade.c); ctx.globalAlpha = 1; }
+      if (age >= 0 && age < 0.7) { ctx.globalAlpha = age < 0.45 ? 1 : 1 - (age - 0.45) / 0.25; txt(this.grade.s, W / 2, H - 150 - age * 16, 26 * (1 + 0.35 * Math.max(0, 1 - age * 9)), this.grade.c); ctx.globalAlpha = 1; }
     }
     // area names
     if (this.areaName) {
       const age = this.t - this.areaName.t0;
-      if (age < 3) { ctx.globalAlpha = age < 0.4 ? age / 0.4 : age > 2.3 ? (3 - age) / 0.7 : 1; txt(this.areaName.s.toUpperCase(), W / 2, 110, 22, '#eafff3'); ctx.fillStyle = NEON; ctx.fillRect(W / 2 - 120, 126, 240, 1); ctx.globalAlpha = 1; }
+      if (age >= 0 && age < 3) { ctx.globalAlpha = age < 0.4 ? age / 0.4 : age > 2.3 ? (3 - age) / 0.7 : 1; txt(this.areaName.s.toUpperCase(), W / 2, 110, 22, '#eafff3'); ctx.fillStyle = NEON; ctx.fillRect(W / 2 - 120, 126, 240, 1); ctx.globalAlpha = 1; }
     }
     if (this.banner) {
       const age = now - this.banner.t0, d = this.banner.dur;

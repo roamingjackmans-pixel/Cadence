@@ -84,7 +84,9 @@ step left and right.
 
 ## Controls
 
-Gamepad: LB block, RB duck, RT jump, LT step, X strike, Y heal, A interact, left stick moves and aims **(owner)**.
+Gamepad: the combat buttons are LT step, LB block, RB duck, A jump, X strike **(owner)**; Y heals, the left stick moves and aims. A also interacts (beacons, doors) when nothing is attacking you; RT is unused. The step is a planted lean back, not a hop **(owner)**.
+
+A new game opens with a quick tutorial in the Boot Chamber **(owner)**: move, jump, then a harmless training echo throws slashes, sweeps and slams until each is answered twice in a row, a fast pair of sweeps (jump, then block on the way down), and a poise break ending in a lethal strike. Walking past the chamber or Skip in the pause menu ends it.
 Keyboard: A/D move, W/Space jump, S duck, J block, K strike, L/Shift step, H heal, E interact.
 
 ## Sound
