@@ -26,6 +26,8 @@ export const input = {
     for (const k of this.keys) if (KEYS[k] === a) return true;
     return this.padHeld.has(a);
   },
+  /** Holding down: the duck key, or the left stick or d-pad pushed down (drops through one-way floors with jump). */
+  down() { return this.held('duck') || this.padHeld.has('down') || this.stickY > 0.5; },
   /** -1..1: keys or the left stick / d-pad. */
   axisX() {
     let x = 0;
@@ -55,6 +57,7 @@ export const input = {
     for (const i in PAD) if (cur[i]) this.padHeld.add(PAD[i]);
     if (cur[14]) this.padHeld.add('left');
     if (cur[15]) this.padHeld.add('right');
+    if (cur[13]) this.padHeld.add('down');
     this.stickX = Math.abs(gp.axes[0] || 0) > 0.2 ? gp.axes[0] : 0;
     this.stickY = Math.abs(gp.axes[1] || 0) > 0.2 ? gp.axes[1] : 0;
     // stick held left/right counts as the direction; flicks also navigate menus (with repeat)

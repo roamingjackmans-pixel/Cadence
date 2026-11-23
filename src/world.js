@@ -149,7 +149,7 @@ export class World {
       p.guardUntil = this.t + DUR.block;
       if (!tg) p.lockUntil = t + 0.2;   // spamming the guard leaves you open
     } else if (a === 'jump') {
-      if (input.held('duck') && this.onPlatform()) { p.y += 3; p.dropUntil = this.t + 0.2; p.onGround = false; return; }
+      if (input.down() && this.onPlatform()) { p.y += 3; p.dropUntil = this.t + 0.2; p.onGround = false; return; }
       p.vy = -JV; p.onGround = false; p.coyote = 0; p.jumpHeld = true; p.jumpKey = from === 'padA' ? 'padA' : 'jump'; p.move = null; p.guardUntil = -9; sfx('jump');
     } else {
       p.move = { kind: a, t0: this.t, until: this.t + DUR[a] };
