@@ -61,3 +61,9 @@ button:focus-visible { outline: 2px solid var(--ice); outline-offset: 3px; }
 .wgrid .wcard h3 { margin: .6em 0 .25em; font-size: .85em; }
 #menu { background: radial-gradient(ellipse at 50% 45%, rgba(2, 20, 12, .82), rgba(0, 4, 2, .96)); }
 @media (max-width: 640px) { .wgrid { grid-template-columns: minmax(0, 1fr); } }
+
+/* sword weight tag on the beacon's sword card */
+.wt { display: inline-block; margin-left: .4em; padding: 0 .45em; border: 1px solid currentColor; border-radius: 3px; font-size: .72em; letter-spacing: .08em; vertical-align: .1em; }
+.wt-light { color: #5ff3ff; }
+.wt-medium { color: #cfeedd; }
+.wt-heavy { color: #3dff9a; }

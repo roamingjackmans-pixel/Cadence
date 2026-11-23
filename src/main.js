@@ -117,7 +117,7 @@ const game = {
     const w = WEAPONS[sel], up = s.upgrades[sel] || 0, uc = upgradeCost(up);
     const pct = (v) => Math.round(Math.min(1, v / 1.6) * 100);
     const row = (label, v) => `<div class="row"><span>${label}</span><div class="bar"><i style="width:${pct(v)}%"></i></div><span>${Math.round(v * 100)}%</span></div>`;
-    const list = owned.map((id) => `<button class="mbtn ${id === s.equipped ? 'eq' : ''}" data-act="pick" data-id="${id}">${WEAPONS[id].name}${s.upgrades[id] ? ' +' + s.upgrades[id] : ''} <small>${WEAPONS[id].cls}${id === s.equipped ? ' · equipped' : ''}</small></button>`).join('');
+    const list = owned.map((id) => `<button class="mbtn ${id === s.equipped ? 'eq' : ''}" data-act="pick" data-id="${id}">${WEAPONS[id].name}${s.upgrades[id] ? ' +' + s.upgrades[id] : ''} <small>${WEAPONS[id].weight} ${WEAPONS[id].cls.toLowerCase()}${id === s.equipped ? ' · equipped' : ''}</small></button>`).join('');
     this.menus.show(`<h2>SWORDS</h2><div class="wgrid"><div>
       <div class="mlist">${list}</div>
       <div class="mlist" style="margin-top:.8em">
@@ -125,7 +125,7 @@ const game = {
         <button class="mbtn ${up < UPGRADE_MAX && s.echoes >= uc ? '' : 'off'}" data-act="upgrade">${up < UPGRADE_MAX ? 'Reforge to +' + (up + 1) : 'Fully reforged'} <small>${up < UPGRADE_MAX ? uc + ' echoes · you have ' + s.echoes : ''}</small></button>
         <button class="mbtn" data-act="back">Back</button>
       </div></div>
-      <div class="wcard"><b>${w.name}${up ? ' +' + up : ''}</b> · ${w.cls}<br><small>${w.desc}</small>
+      <div class="wcard"><b>${w.name}${up ? ' +' + up : ''}</b> · ${w.cls} <span class="wt wt-${w.weight.toLowerCase()}">${w.weight.toUpperCase()}</span><br><small>${w.desc}</small>
         <h3>BLOCK WINDOW</h3>${row('Slash', w.block.slash)}${row('Sweep', w.block.sweep)}${row('Slam', w.block.slam)}
         <h3>EVADE WINDOW</h3>${row('Duck', w.evade.duck)}${row('Jump', w.evade.jump)}${row('Step', w.evade.dodge)}
         <h3>BLADE</h3>${row('Damage', w.dmg * (1 + 0.12 * up) / 20)}${row('Speed', 0.42 / w.dur)}${row('Perfect', w.perfect)}
