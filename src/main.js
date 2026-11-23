@@ -175,6 +175,7 @@ function controlsMenu(back) {
       <span></span><b>KEYBOARD</b><b>GAMEPAD</b>
       <span>Move · aim</span><span>A / D</span><span>Left stick</span>
       <span>Jump</span><span>W · Space</span><span>A</span>
+      <span>Small jump</span><span>tap W</span><span>RT</span>
       <span>Drop through a floor</span><span>S + W</span><span>Down + A</span>
       <span>Duck</span><span>S</span><span>RB</span>
       <span>Block</span><span>J</span><span>LB</span>

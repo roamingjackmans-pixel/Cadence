@@ -14,7 +14,8 @@ let CTX = null;
 const txt = (s, x, y, size, c, align, weight) => txtC(CTX, s, x, y, size, c, align, weight);
 
 const VW = W / Z, VH = H / Z;
-const RUN = 255, JV = 780, GRAV = 2600, MAXFALL = 1100, STEP = 1 / 120;
+// JV is the full jump (held for height), HOP the small jump on RT: about a tile and a quarter
+const RUN = 255, JV = 780, HOP = 440, NEAR_FOE = 155, GRAV = 2600, MAXFALL = 1100, STEP = 1 / 120;
 const wrap = (s, n) => { const out = []; let cur = ''; for (const w of s.split(' ')) { if (cur && (cur + ' ' + w).length > n) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; } if (cur) out.push(cur); return out; };
 const PLAYER_C = '#5ff3ff', PLAYER_RGB = '95,243,255';
 const ENEMY_C = '#e9fbff', ENEMY_RGB = '233,251,255';
@@ -127,6 +128,7 @@ export class World {
     if (t < p.stunUntil) return;
     if (a === 'interact') { this.interact(); return; }
     // the pad's A: interact when nothing is attacking you and there is something to use, otherwise jump
+    if (a === 'hop') { this.press('jump', t, 'hop'); return; }
     if (a === 'padA') { if (this.attackers().length || !this.interact()) this.press('jump', t, 'padA'); return; }
     if (a === 'heal') { this.startHeal(); return; }
     if (a === 'attack') { this.startAttack(); return; }
@@ -150,7 +152,9 @@ export class World {
       if (!tg) p.lockUntil = t + 0.2;   // spamming the guard leaves you open
     } else if (a === 'jump') {
       if (input.down() && this.onPlatform()) { p.y += 3; p.dropUntil = this.t + 0.2; p.onGround = false; return; }
-      p.vy = -JV; p.onGround = false; p.coyote = 0; p.jumpHeld = true; p.jumpKey = from === 'padA' ? 'padA' : 'jump'; p.move = null; p.guardUntil = -9; sfx('jump');
+      // the tall jump is for getting around: in a fight, or within about 15 ft of an enemy, every jump is the small one
+      const hop = from === 'hop' || this.nearFoe();
+      p.vy = hop ? -HOP : -JV; p.onGround = false; p.coyote = 0; p.jumpHeld = !hop; p.jumpKey = from === 'padA' ? 'padA' : 'jump'; p.move = null; p.guardUntil = -9; sfx('jump');
     } else {
       p.move = { kind: a, t0: this.t, until: this.t + DUR[a] };
       p.guardUntil = -9;
@@ -161,6 +165,8 @@ export class World {
     if (t >= tg.n.time) this.apply(tg.n);
   }
   nextType() { const n = this.cond.notes.find((m) => !m.result && m.time > this.t - 0.1); return n && n.type; }
+  /** In combat, or a living enemy within about 15 ft (the player is 62 px, about 6 ft). */
+  nearFoe() { const p = this.p; return this.attackers().length > 0 || this.enemies.some((e) => !e.dead && Math.hypot(e.x - p.x, e.y - p.y) < NEAR_FOE); }
   onPlatform() { const p = this.p; return this.tileAt(p.x, p.y + 2) === 2 && this.tileAt(p.x, p.y - 2) !== 2; }
 
   startAttack() {

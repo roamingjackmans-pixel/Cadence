@@ -22,6 +22,7 @@ The first area, the Verdant Circuit, ends in a third-person duel with the Twin D
 | :- | :- | :- |
 | Move, aim | A / D | left stick |
 | Jump | W, Space | A |
+| Small jump | tap W | RT |
 | Drop through a floor | S + W | down + A |
 | Duck | S | RB |
 | Block | J | LB |
@@ -32,7 +33,7 @@ The first area, the Verdant Circuit, ends in a third-person duel with the Twin D
 | Pause | Esc | Start |
 | Answer hints | I | Back |
 
-With an attacker on each side, hold the stick toward the one you block. Duck, jump and step work against both.
+In a fight, or within about 15 ft of an enemy, every jump is the small one. With an attacker on each side, hold the stick toward the one you block. Duck, jump and step work against both.
 
 ## Running it locally
 

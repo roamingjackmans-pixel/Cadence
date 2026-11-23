@@ -11,8 +11,9 @@ const KEYS = {
 /* menu navigation reads these too */
 const NAV = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', Enter: 'confirm', Space: 'confirm', KeyE: 'confirm', KeyJ: 'confirm', Escape: 'back', Backspace: 'back', KeyK: 'back' };
 /* standard gamepad mapping */
-// combat sits on LT step, LB block, RB duck, A jump, X strike (owner); A also interacts when nothing is attacking you
-const PAD = { 4: 'block', 5: 'duck', 6: 'dodge', 0: 'padA', 2: 'attack', 3: 'heal', 9: 'pause', 8: 'hints' };
+// combat sits on LT step, LB block, RB duck, A jump, X strike (owner); A also interacts when nothing is attacking you.
+// RT is a small jump: the same answer to a sweep, a fixed low hop just onto a block (owner).
+const PAD = { 4: 'block', 5: 'duck', 6: 'dodge', 0: 'padA', 7: 'hop', 2: 'attack', 3: 'heal', 9: 'pause', 8: 'hints' };
 const PADNAV = { 12: 'up', 13: 'down', 14: 'left', 15: 'right', 0: 'confirm', 1: 'back', 9: 'back' };
 
 export const input = {

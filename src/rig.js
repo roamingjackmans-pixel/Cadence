@@ -9,7 +9,8 @@ export const POSES = {
   run2: P({ chest: [6, -73], head: [9, -89], kF: [4, -26], fF: [-6, 0], kB: [10, -30], fB: [6, -10], eF: [16, -60], hF: [26, -58] }),
   jump: P({ hip: [0, -52], chest: [2, -78], head: [4, -94], sh: [2, -76], kF: [14, -36], fF: [8, -16], kB: [-2, -32], fB: [-12, -16], eF: [14, -66], hF: [22, -70], eB: [-10, -66], hB: [-4, -72], sa: -1.3 }),
   fall: P({ hip: [0, -50], kF: [12, -30], fF: [14, -8], kB: [-6, -28], fB: [-14, -6], eB: [-14, -68], hB: [-18, -78], sa: -0.7 }),
-  duck: P({ hip: [-2, -30], chest: [8, -52], head: [13, -66], sh: [8, -50], eF: [18, -40], hF: [26, -38], eB: [2, -38], hB: [12, -34], kF: [16, -18], fF: [16, 0], kB: [-14, -12], fB: [-18, 0], sa: -0.25 }),
+  // a deep crouch: back knee nearly on the floor, body folded forward over the front knee
+  duck: P({ hip: [-4, -22], chest: [12, -40], head: [24, -48], sh: [12, -38], eF: [22, -28], hF: [30, -24], eB: [6, -28], hB: [16, -22], kF: [16, -14], fF: [18, 0], kB: [-20, -4], fB: [-34, 0], sa: -0.15 }),
   // a bullet-time lean: feet planted, knees forward, the body arched back under the strike
   dodge: P({ hip: [8, -36], chest: [-16, -45], head: [-33, -46], sh: [-16, -43], eF: [-10, -59], hF: [-3, -68], eB: [-29, -35], hB: [-41, -29], kF: [24, -20], fF: [19, 0], kB: [18, -16], fB: [0, 0], sa: -2.15 }),
   // blocks, one for each strike
