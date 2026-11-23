@@ -149,6 +149,7 @@ export class World {
       if (tg && atk.length < 2) p.face = sign(tg.n.owner.x - p.x);
       p.blockKind = tg ? tg.n.type : this.nextType() || 'slash';
       p.guardUntil = this.t + DUR.block;
+      if (p.move && p.move.kind === 'duck' && this.t < p.move.until) p.move.until = Math.max(p.move.until, p.guardUntil);   // stay down through the block
       if (!tg) p.lockUntil = t + 0.2;   // spamming the guard leaves you open
     } else if (a === 'jump') {
       if (input.down() && this.onPlatform()) { p.y += 3; p.dropUntil = this.t + 0.2; p.onGround = false; return; }
@@ -235,7 +236,11 @@ export class World {
       if (p.atk.lethal) { pose = k < 0.15 ? POSES.attackW : POSES.lethal; rate = k < 0.15 ? 26 : 50; }
       else if (k < h0) { pose = POSES.attackW; rate = 30; }
       else { pose = p.weapon.twin && p.atk.done > 1 ? POSES.attack2 : POSES.attack; rate = 60; }
-    } else if (t < p.guardUntil) { pose = p.blockKind === 'sweep' ? POSES.blockSweep : p.blockKind === 'slam' ? POSES.blockSlam : POSES.blockSlash; rate = 50; }
+    } else if (t < p.guardUntil) {
+      // blocking from a duck keeps the crouch and brings the blade up from it
+      const low = p.move && p.move.kind === 'duck' && t < p.move.until, k = p.blockKind === 'sweep' ? 'Sweep' : p.blockKind === 'slam' ? 'Slam' : 'Slash';
+      pose = POSES[(low ? 'duckBlock' : 'block') + k]; rate = 50;
+    }
     else if (p.move && t < p.move.until) { pose = p.move.kind === 'duck' ? POSES.duck : POSES.dodge; rate = 45; }
     else if (p.heal) { pose = POSES.heal; rate = 14; }
     else if (!p.onGround) { pose = p.vy < 0 ? POSES.jump : POSES.fall; rate = 16; }

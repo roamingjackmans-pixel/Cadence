@@ -1,6 +1,6 @@
 # Cadence
 
-A neon 2D souls-like where every enemy fights to its own rhythm. Play it at **https://josephjackman.com/Cadence/**.
+A neon 2D souls-like where every enemy fights to its own rhythm. Play it at **https://josephjackman.com/games/Cadence/**.
 
 Every strike is one of three, and each has two answers:
 
@@ -47,10 +47,12 @@ then open http://localhost:8765. Run `npm install` once for the tools (Playwrigh
 
 ## Deploying
 
-Push to `main`. [.github/workflows/deploy.yml](.github/workflows/deploy.yml) runs `npm test` (the conductor fuzz
+Push to `main`. [.github/workflows/ready.yml](.github/workflows/ready.yml) runs `npm test` (the conductor fuzz
 test), builds `_site/` with `tools/stamp.mjs` (a version stamp and `?v=<commit>` on every URL, so browsers never mix a
-cached file with a new one), plays that build headlessly with `tools/smoke.mjs`, and only then publishes it to
-https://josephjackman.com/Cadence/. `/games/cadence/` and `/cadence/` redirect there.
+cached file with a new one), plays that build headlessly with `tools/smoke.mjs`, and only then moves the `ready`
+branch to that commit. The games site ([roamingjackmans-pixel/games](https://github.com/roamingjackmans-pixel/games))
+picks up new `ready` commits within 10 minutes, builds them with `tools/stamp-build.mjs` and publishes them at
+https://josephjackman.com/games/Cadence/. `/Cadence/`, `/cadence/` and `/games/cadence/` redirect there.
 
 `tools/perf*.mjs` are the frame-time benchmarks and `tools/shots.mjs` screenshots a few scenes.
 

@@ -1,0 +1,45 @@
+# Gets each push to main ready for josephjackman.com/games/Cadence/.
+#   1. the conductor fuzz test: every two-attacker schedule can be answered perfectly
+#   2. tools/stamp.mjs builds _site/ with ?v=<commit> on every URL, so a new build never mixes with a cached one
+#   3. tools/smoke.mjs plays that build headlessly: fights, the ambush, the arena, the duel, the save
+#   4. when all of that passes, the `ready` branch moves to this commit
+# The `games` repo (roamingjackmans-pixel/games) publishes every game on josephjackman.com/games/. It looks for new
+# `ready` commits every 10 minutes and builds this one with tools/stamp-build.mjs, or hears right away when this repo
+# has a GAMES_DEPLOY_TOKEN secret (a fine-grained token allowed to run Actions on the games repo).
+name: Ready for the games site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ready
+  cancel-in-progress: true
+
+jobs:
+  ready:
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_TOKEN: ${{ secrets.GAMES_DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: node tools/stamp.mjs _site "$GITHUB_SHA"
+      - run: npx playwright install --with-deps chromium
+      - run: node tools/smoke.mjs _site
+      - name: Mark this commit ready
+        run: git push --force origin HEAD:refs/heads/ready
+      - name: Tell the games site
+        if: env.DEPLOY_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ env.DEPLOY_TOKEN }}
+        run: gh workflow run deploy.yml -R roamingjackmans-pixel/games

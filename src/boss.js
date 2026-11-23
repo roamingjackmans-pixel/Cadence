@@ -28,7 +28,8 @@ const PP = {
   blockSlam: PV({ hip: [0, -86], chest: [0, -136], head: [0, -172], lS: [-26, -146], rS: [26, -146], lE: [-44, -172], rE: [44, -172], lH: [-26, -204], rH: [30, -206], lK: [-28, -44], rK: [28, -44], lF: [-36, 0], rF: [36, 0], sa: Math.PI + 0.08, sl: 1 }),
   blockSlash: PV({ lE: [-36, -118], rE: [40, -112], lH: [-2, -130], rH: [10, -126], sa: -2.3, sl: 1 }),
   blockSweep: PV({ hip: [0, -80], chest: [0, -128], head: [0, -164], lS: [-26, -138], rS: [26, -138], lE: [-30, -104], rE: [38, -100], lH: [10, -92], rH: [22, -90], lK: [-28, -40], rK: [28, -40], lF: [-36, 0], rF: [36, 0], sa: 2.35, sl: 1 }),
-  duck: PV({ hip: [0, -38], chest: [0, -72], head: [0, -98], lS: [-28, -78], rS: [28, -78], lE: [-36, -54], rE: [40, -56], lH: [2, -52], rH: [14, -54], lK: [-42, -22], rK: [42, -22], lF: [-38, 0], rF: [38, 0], sa: -0.6, sl: 0.8 }),
+  // a ninja crouch: one knee nearly down, a hand on the floor
+  duck: PV({ hip: [0, -26], chest: [4, -54], head: [8, -78], lS: [-22, -60], rS: [30, -60], lE: [-34, -36], rE: [44, -42], lH: [-30, -8], rH: [26, -44], lK: [-50, -14], rK: [42, -28], lF: [-62, 0], rF: [34, 0], sa: -0.35, sl: 0.8 }),
   jump: PV({ hip: [0, -100], chest: [0, -148], head: [0, -184], lS: [-26, -158], rS: [26, -158], lE: [-34, -160], rE: [34, -160], lH: [-10, -170], rH: [0, -172], lK: [-24, -70], rK: [24, -66], lF: [-20, -36], rF: [22, -34], sa: -1.9, sl: 0.9 }),
   sideR: PV({ hip: [0, -88], chest: [14, -136], head: [22, -172], lS: [-12, -146], rS: [38, -144], lE: [-24, -112], rE: [48, -110], lH: [6, -100], rH: [18, -102], lK: [-30, -44], rK: [30, -48], lF: [-50, -4], rF: [40, 0], sa: -0.9, sl: 0.8 }),
   attack: PV({ hip: [0, -90], chest: [-4, -142], head: [-4, -180], lS: [-30, -152], rS: [22, -152], lE: [-40, -176], rE: [10, -180], lH: [-36, -196], rH: [-26, -198], lF: [-36, 0], rF: [26, -4], sa: -2.5, sl: 1 }),
@@ -159,6 +160,7 @@ export class BossFight {
     if (a === 'block') {
       p.blockKind = tg ? tg.n.type : (this.cond.notes.find((n) => !n.result && n.time > this.t - 0.1) || {}).type || 'slash';
       p.guardUntil = this.t + DUR.block;
+      if (p.move && p.move.kind === 'duck' && this.t < p.move.until) p.move.until = Math.max(p.move.until, p.guardUntil);   // stay down through the block
       if (!tg) p.lockUntil = t + 0.2;
     } else {
       if (a === 'side') { p.sideDir = dir; sfx('evade'); }

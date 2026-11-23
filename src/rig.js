@@ -9,8 +9,9 @@ export const POSES = {
   run2: P({ chest: [6, -73], head: [9, -89], kF: [4, -26], fF: [-6, 0], kB: [10, -30], fB: [6, -10], eF: [16, -60], hF: [26, -58] }),
   jump: P({ hip: [0, -52], chest: [2, -78], head: [4, -94], sh: [2, -76], kF: [14, -36], fF: [8, -16], kB: [-2, -32], fB: [-12, -16], eF: [14, -66], hF: [22, -70], eB: [-10, -66], hB: [-4, -72], sa: -1.3 }),
   fall: P({ hip: [0, -50], kF: [12, -30], fF: [14, -8], kB: [-6, -28], fB: [-14, -6], eB: [-14, -68], hB: [-18, -78], sa: -0.7 }),
-  // a deep crouch: back knee nearly on the floor, body folded forward over the front knee
-  duck: P({ hip: [-4, -22], chest: [12, -40], head: [24, -48], sh: [12, -38], eF: [22, -28], hF: [30, -24], eB: [6, -28], hB: [16, -22], kF: [16, -14], fF: [18, 0], kB: [-20, -4], fB: [-34, 0], sa: -0.15 }),
+  // a ninja crouch: folded low over the front knee, back leg stretched out behind, a hand on the floor,
+  // the blade trailing back
+  duck: P({ hip: [-6, -16], chest: [12, -30], head: [26, -34], sh: [12, -28], eF: [26, -20], hF: [34, -14], eB: [16, -14], hB: [20, -2], kF: [14, -12], fF: [20, 0], kB: [-24, -6], fB: [-44, 0], sa: -3.0 }),
   // a bullet-time lean: feet planted, knees forward, the body arched back under the strike
   dodge: P({ hip: [8, -36], chest: [-16, -45], head: [-33, -46], sh: [-16, -43], eF: [-10, -59], hF: [-3, -68], eB: [-29, -35], hB: [-41, -29], kF: [24, -20], fF: [19, 0], kB: [18, -16], fB: [0, 0], sa: -2.15 }),
   // blocks, one for each strike
@@ -36,6 +37,19 @@ export const POSES = {
   open: P({ hip: [2, -44], chest: [10, -66], head: [16, -78], sh: [10, -64], eF: [16, -46], hF: [20, -30], eB: [4, -48], hB: [8, -34], sa: 1.35, kF: [12, -22], fF: [18, 0], kB: [-8, -22], fB: [-16, 0] }),
   broken: P({ hip: [0, -30], chest: [6, -52], head: [12, -64], sh: [6, -50], eF: [12, -32], hF: [14, -16], eB: [0, -34], hB: [2, -18], kF: [14, -18], fF: [18, 0], kB: [-8, -4], fB: [-24, 0], sa: 1.5 }),
 };
+
+/** A block held from another stance (the duck): the body stays put, the arms and blade come up from its shoulders. */
+const ARMS = ['eFx', 'eFy', 'hFx', 'hFy', 'eBx', 'eBy', 'hBx', 'hBy'];
+export function withGuard(base, g) {
+  const r = { ...base }, dx = base.shx - g.shx, dy = base.shy - g.shy;
+  for (const k of ARMS) r[k] = g[k] + (k.endsWith('x') ? dx : dy);
+  r.sa = g.sa; r.sl = g.sl; r.sa2 = g.sa2;
+  return r;
+}
+// blocks from the crouch; a low guard holds the blade flat instead of down into the floor
+POSES.duckBlockSlash = withGuard(POSES.duck, POSES.blockSlash);
+POSES.duckBlockSlam = withGuard(POSES.duck, POSES.blockSlam);
+POSES.duckBlockSweep = { ...withGuard(POSES.duck, POSES.blockSweep), eFx: 26, eFy: -20, hFx: 36, hFy: -14, sa: 0.05 };
 
 export function lerpPose(cur, tgt, k) { for (const key in tgt) { const d = tgt[key] - cur[key]; cur[key] += (key === 'sa' || key === 'sa2' ? Math.atan2(Math.sin(d), Math.cos(d)) : d) * k; } }
 export function copyPose(p) { return { ...p }; }
