@@ -317,12 +317,9 @@ export class World {
     if (e.state === 'aggro') {
       e.face = sign(dx) || e.face;
       const hold = e.slot ? def.engage : def.engage + 95;
-      if (!striking && t > e.knockUntil) {
-        if (dist > hold + 8) want = sign(dx) * def.speed * (e.slot ? 1 : 0.8);
-        else if (dist < hold - 18 && Math.abs(dy) < 40) want = -sign(dx) * def.speed * 0.5;
-      }
+      // enemies close in and then hold their ground: walking into one never shoves it back (owner)
+      if (!striking && t > e.knockUntil && dist > hold + 8) want = sign(dx) * def.speed * (e.slot ? 1 : 0.8);
     } else if (Math.abs(e.x - e.home) > 8) { want = sign(e.home - e.x) * def.speed * 0.5; e.face = sign(want); }
-    if (t < e.knockUntil) want = -e.face * 120;
     // don't walk off ledges
     if (want && e.onGround) { const ahead = e.x + sign(want) * (e.w / 2 + 4), v = this.tileAt(ahead, e.y + 4); if (v === 0) want = 0; }
     e.vx += (want - e.vx) * Math.min(1, dt * 10);
@@ -438,7 +435,7 @@ export class World {
     } else if (n.result === 'miss') {
       this.hurt(n.type === 'slam' ? def.slamDmg : def.dmg, n.type);
     }
-    // a whole phrase answered perfectly throws the attacker back
+    // a whole phrase answered perfectly staggers the attacker where it stands and leaves it open
     const sg = n.seg; sg.done++; if (n.result === 'perfect') sg.perfect++;
     if (sg.done === sg.n && sg.perfect === sg.n && sg.n >= 2 && !e.dead && !e.brokenUntil) {
       this.gainPoise(e, 10); e.knockUntil = t + 0.35; e.openEnd = Math.max(e.openEnd, t + 1.0); e.openStart = Math.min(e.openStart, t);
