@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cadence</title>
+<meta name="description" content="A neon 2D souls-like where every enemy fights to its own rhythm. Duck the red slashes, jump the yellow sweeps, step out of the purple slams.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23020806'/%3E%3Cpath d='M8 24 L16 6 L24 24' fill='none' stroke='%233dff9a' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="cv" aria-label="Cadence game view"></canvas>
+
+    <div id="title" class="overlay">
+      <div class="panel">
+        <div class="kicker">A DANCE OF BLADES</div>
+        <h1>CADENCE</h1>
+        <p class="sub">Every enemy fights to its own rhythm. Read the beat above its head and answer each strike.</p>
+        <div class="legend">
+          <div class="atk"><i class="pip slash"></i><div><b class="c-slash">SLASH</b><small>Duck or block</small></div></div>
+          <div class="atk"><i class="pip sweep"></i><div><b class="c-sweep">SWEEP</b><small>Jump or block</small></div></div>
+          <div class="atk"><i class="pip slam"></i><div><b class="c-slam">SLAM</b><small>Step aside or block</small></div></div>
+        </div>
+        <p class="rule">Your guard can't take two fast strikes in a row: mix in a duck, a jump or a step. Fill the enemy's poise and finish it with a lethal strike. Back off and its poise recovers.</p>
+        <div class="btns" id="titleBtns">
+          <button class="main" data-act="continue" id="btnContinue">CONTINUE</button>
+          <button class="main" data-act="new" id="btnNew">NEW GAME</button>
+          <button class="ghost" data-act="controls">CONTROLS</button>
+        </div>
+        <div class="foot">Keyboard or gamepad · <span id="ver"></span></div>
+      </div>
+    </div>
+
+    <div id="menu" class="overlay hidden"><div class="panel" id="menuPanel"></div></div>
+  </div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
