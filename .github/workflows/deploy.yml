@@ -1,0 +1,46 @@
+# Checks every push to main and, when the checks pass, publishes it to josephjackman.com/Cadence/.
+# This repo is named "Cadence", so its Pages site is josephjackman.com/Cadence/ (the account's user site has the
+# josephjackman.com custom domain). The /games/ hub links here, and /games/cadence/ redirects here.
+#   1. the conductor fuzz test: every two-attacker schedule can be answered perfectly
+#   2. tools/stamp.mjs builds _site/ with ?v=<commit> on every URL, so a new build never mixes with a cached one
+#   3. tools/smoke.mjs plays the stamped build headlessly: fights, the ambush, the arena, the duel, the save
+#   4. _site/ goes to GitHub Pages
+name: Check and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: node tools/stamp.mjs _site "$GITHUB_SHA"
+      - run: npx playwright install --with-deps chromium
+      - run: node tools/smoke.mjs _site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

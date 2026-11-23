@@ -38,10 +38,18 @@ With an attacker on each side, hold the stick toward the one you block. Duck, ju
 Plain ES modules, no build step:
 
 ```powershell
-py -m http.server 8765
+npm run serve
 ```
 
-then open http://localhost:8765. `tools/` has the Playwright benchmarks and screenshot scripts (they borrow the
-Playwright install in `C:\dev\DungeonJoe`).
+then open http://localhost:8765. Run `npm install` once for the tools (Playwright).
+
+## Deploying
+
+Push to `main`. [.github/workflows/deploy.yml](.github/workflows/deploy.yml) runs `npm test` (the conductor fuzz
+test), builds `_site/` with `tools/stamp.mjs` (a version stamp and `?v=<commit>` on every URL, so browsers never mix a
+cached file with a new one), plays that build headlessly with `tools/smoke.mjs`, and only then publishes it to
+https://josephjackman.com/Cadence/. `/games/cadence/` and `/cadence/` redirect there.
+
+`tools/perf*.mjs` are the frame-time benchmarks and `tools/shots.mjs` screenshots a few scenes.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the rules and the decisions behind them.

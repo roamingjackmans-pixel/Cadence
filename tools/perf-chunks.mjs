@@ -1,7 +1,5 @@
 // Time to paint level chunks (software canvas, no throttle): node tools/perf-chunks.mjs [url]
-import { createRequire } from 'node:module';
-const require = createRequire((process.env.PLAYWRIGHT_DIR || 'C:/dev/DungeonJoe') + '/package.json');
-const { chromium } = require('playwright');
+import { chromium } from 'playwright';
 const browser = await chromium.launch({ args: ['--disable-gpu', '--disable-accelerated-2d-canvas'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 await page.goto(process.argv[2] || 'http://127.0.0.1:8765/');

@@ -1,7 +1,5 @@
 // Screenshots of a few scenes: node tools/shots.mjs <outDir> [url]
-import { createRequire } from 'node:module';
-const require = createRequire((process.env.PLAYWRIGHT_DIR || 'C:/dev/DungeonJoe') + '/package.json');
-const { chromium } = require('playwright');
+import { chromium } from 'playwright';
 const out = process.argv[2] || '.';
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1.5 });

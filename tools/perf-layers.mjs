@@ -1,8 +1,6 @@
 // Which layer of the side view costs the most to rasterise? Turns layers off one at a time (software canvas).
 //   node tools/perf-layers.mjs [url] [throttle]
-import { createRequire } from 'node:module';
-const require = createRequire((process.env.PLAYWRIGHT_DIR || 'C:/dev/DungeonJoe') + '/package.json');
-const { chromium } = require('playwright');
+import { chromium } from 'playwright';
 const url = process.argv[2] || 'http://127.0.0.1:8765/';
 const browser = await chromium.launch({ args: ['--disable-gpu', '--disable-accelerated-2d-canvas'] });
 const hi = process.argv.includes('--hi');

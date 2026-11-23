@@ -1,9 +1,7 @@
 // Frame-time benchmark. Plays scripted scenes with the CPU throttled and prints update/render costs.
 //   node tools/perf.mjs [url] [throttle]
 // Uses the Playwright install in C:\dev\DungeonJoe (or PLAYWRIGHT_DIR).
-import { createRequire } from 'node:module';
-const require = createRequire((process.env.PLAYWRIGHT_DIR || 'C:/dev/DungeonJoe') + '/package.json');
-const { chromium } = require('playwright');
+import { chromium } from 'playwright';
 
 const url = process.argv[2] || 'http://127.0.0.1:8765/';
 const throttle = +(process.argv[3] || 4);

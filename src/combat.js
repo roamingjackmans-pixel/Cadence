@@ -40,8 +40,11 @@ export function survivable(list) {
 export class Conductor {
   constructor() { this.notes = []; }
 
-  /** Strikes that still matter for planning: anything not long past. */
-  live(now) { return this.notes.filter((n) => !n.cancelled && n.time > now - 0.35); }
+  /**
+   * Strikes that still matter for planning: anything not yet landed, and anything landed recently enough that its
+   * answer still binds you (a jump keeps you up JUMP_AIR, a block refuses another for FAST_PAIR).
+   */
+  live(now) { return this.notes.filter((n) => !n.cancelled && (!n.applied || n.time > now - JUMP_AIR - FAST_PAIR - 0.1)); }
 
   /**
    * Fits `phrase` for `owner` starting no earlier than t0. Returns the new notes (already added) or null.
@@ -50,7 +53,7 @@ export class Conductor {
   plan(owner, phrase, beat, t0, now, opts = {}) {
     const rel = parsePhrase(phrase, beat);
     if (!rel.length) return null;
-    const others = this.live(now).filter((n) => n.owner !== owner || n.time > now);
+    const others = this.live(now);
     const maxShift = opts.maxShift ?? 1.6;
     for (let shift = 0; shift <= maxShift + 1e-6; shift += 0.05) {
       let cand = rel.map((r) => ({ type: r.type, time: t0 + shift + r.dt }));

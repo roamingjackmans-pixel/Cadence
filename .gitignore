@@ -4,3 +4,4 @@ Blade Cadence prototype*.html
 .claude/
 node_modules/
 *.log
+_site/
