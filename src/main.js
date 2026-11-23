@@ -117,6 +117,11 @@ const game = {
     const w = WEAPONS[sel], up = s.upgrades[sel] || 0, uc = upgradeCost(up);
     const pct = (v) => Math.round(Math.min(1, v / 1.6) * 100);
     const row = (label, v) => `<div class="row"><span>${label}</span><div class="bar"><i style="width:${pct(v)}%"></i></div><span>${Math.round(v * 100)}%</span></div>`;
+    // how much each stat point adds to this sword's damage, as a souls-style letter
+    const grade = (v) => (v >= 1.2 ? 'A' : v >= 0.9 ? 'B' : v >= 0.5 ? 'C' : 'D');
+    const scale = (label, v) => `<div class="row"><span>${label}</span><div class="bar"><i style="width:${Math.round(Math.min(1, v / 1.4) * 100)}%"></i></div><span>${grade(v)}</span></div>`;
+    const scaling = w.weight === 'Medium' ? 'Medium: Strength and Finesse both raise its damage, equally.'
+      : 'Mostly scales with ' + (w.str >= w.fin ? 'Strength' : 'Finesse') + '.';
     const list = owned.map((id) => `<button class="mbtn ${id === s.equipped ? 'eq' : ''}" data-act="pick" data-id="${id}">${WEAPONS[id].name}${s.upgrades[id] ? ' +' + s.upgrades[id] : ''} <small>${WEAPONS[id].weight} ${WEAPONS[id].cls.toLowerCase()}${id === s.equipped ? ' · equipped' : ''}</small></button>`).join('');
     this.menus.show(`<h2>SWORDS</h2><div class="wgrid"><div>
       <div class="mlist">${list}</div>
@@ -129,7 +134,8 @@ const game = {
         <h3>BLOCK WINDOW</h3>${row('Slash', w.block.slash)}${row('Sweep', w.block.sweep)}${row('Slam', w.block.slam)}
         <h3>EVADE WINDOW</h3>${row('Duck', w.evade.duck)}${row('Jump', w.evade.jump)}${row('Step', w.evade.dodge)}
         <h3>BLADE</h3>${row('Damage', w.dmg * (1 + 0.12 * up) / 20)}${row('Speed', 0.42 / w.dur)}${row('Perfect', w.perfect)}
-        <small>Scales with ${w.str >= w.fin ? 'Strength' : 'Finesse'}.${w.riposte ? ' Riposte after a deflect.' : ''}${w.focus ? ' Perfect evades sharpen focus.' : ''}</small></div></div>`,
+        <h3>SCALING</h3>${scale('Strength', w.str)}${scale('Finesse', w.fin)}
+        <small>${scaling}${w.riposte ? ' Riposte after a deflect.' : ''}${w.focus ? ' Perfect evades sharpen focus.' : ''}</small></div></div>`,
     {
       pick: (el) => this.weaponMenu(b, el.dataset.id, true),
       equip: () => { s.equipped = sel; this.world.p.weapon = WEAPONS[sel]; this.persist(); sfx('pickup'); this.weaponMenu(b, sel, true); },

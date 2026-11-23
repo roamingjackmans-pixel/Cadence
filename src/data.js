@@ -21,6 +21,7 @@ export const LEAD = 1.5;                                  // pips appear this lo
  * Swords. block/evade multiply the timing windows for each attack (block) or each move (evade).
  * A weapon that blocks well is heavy to move in; a light one dodges well and blocks poorly. `weight` is the label the
  * beacon shows for that: Heavy (guards better than it moves), Light (moves better than it guards), Medium (even).
+ * str/fin are how much each point of Strength/Finesse adds to its damage; a Medium sword gains from both equally.
  */
 export const WEAPONS = {
   arming: {
@@ -57,8 +58,8 @@ export const upgradeCost = (lvl) => [300, 700, 1400][lvl] ?? Infinity;
 export const STATS = {
   vit: { name: 'Vitality', desc: '+9 health' },
   guard: { name: 'Guard', desc: 'Blocks fill your poise 4% less' },
-  str: { name: 'Strength', desc: 'Damage with heavy blades' },
-  fin: { name: 'Finesse', desc: 'Damage with light blades' },
+  str: { name: 'Strength', desc: 'Damage with heavy and medium blades' },
+  fin: { name: 'Finesse', desc: 'Damage with light and medium blades' },
   focus: { name: 'Focus', desc: 'Timing windows 1.5% wider' },
 };
 export const STAT_ORDER = ['vit', 'guard', 'str', 'fin', 'focus'];
