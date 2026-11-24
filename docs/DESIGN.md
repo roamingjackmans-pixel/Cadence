@@ -77,8 +77,10 @@ Sentinel, Shardling, Mirror Duelist, Hammerframe. Built from rectangles in `src/
 
 ## The boss
 
-The Twin Dancer **(owner)**. At the arena door you walk in, the screen flashes, and the view moves behind you for the
-1v1, as in the prototype: incoming strikes fly in from behind her as coloured blades showing their path. Three phases,
+The Twin Dancer **(owner)**. At the arena door you walk in and stop, and the camera takes over with no fade
+**(owner)**: she is already standing in the arena, and over about six seconds the camera turns slowly from side-on,
+keeping you in frame, until it is behind you with her ahead. Then it crossfades into the 1v1 view, as in the prototype
+(A, X or E skips it). Incoming strikes fly in from behind her as coloured blades showing their path. Three phases,
 each faster; a lethal strike ends each. No music chart: her timing is her own **(owner)**. A/D (or LT with the stick)
 step left and right.
 

@@ -612,7 +612,9 @@ export class World {
     if (p.x < targetX) { p.vx = 120; p.face = 1; p.walkPh += dt * 4.6; this.poseTo(p, Math.sin(p.walkPh) > 0 ? POSES.run1 : POSES.run2, 10, dt); }
     else { p.vx = 0; this.poseTo(p, POSES.idle, 8, dt); }
     this.physics(p, dt, true);
-    if (k > 3.2 && !c.done) { c.done = true; this.g.startBoss(); }
+    if (p.x >= targetX && c.stopAt === undefined) c.stopAt = this.t;
+    // no fade: once you've stopped, the duel's camera takes over from this same side-on view
+    if (c.stopAt !== undefined && this.t - c.stopAt > 0.35 && !c.done) { c.done = true; this.g.startBoss(); }
   }
 
   /* ---------- autoplay (recordings) ---------- */
@@ -893,7 +895,6 @@ export class World {
         ctx.globalAlpha = 1;
       }
     }
-    if (this.cut) { const k = clamp((this.t - this.cut.t0 - 2.4) / 0.8, 0, 1); if (k > 0) { ctx.fillStyle = `rgba(255,255,255,${k})`; ctx.fillRect(0, 0, W, H); } }
   }
 }
 function t2col(f, stun) { return stun ? '#ffffff' : f > 0.75 ? '#ffffff' : '#bfe9e0'; }

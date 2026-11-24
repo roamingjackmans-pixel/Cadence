@@ -79,7 +79,8 @@ function drawRig(ctx, o) {
   const lHip = { x: hip.x - 13 * s, y: hip.y }, rHip = { x: hip.x + 13 * s, y: hip.y };
   const sdx = Math.cos(p.sa), sdy = Math.sin(p.sa), L = o.sword * p.sl * s;
   const tip = { x: rH.x + sdx * L, y: rH.y + sdy * L };
-  const sa2 = Math.PI - p.sa, tip2 = o.twin ? { x: lH.x + Math.cos(sa2) * L * 0.92, y: lH.y + Math.sin(sa2) * L * 0.92 } : null;
+  const sa2 = p.sa2 ?? Math.PI - p.sa, L2 = p.sl2 !== undefined ? o.sword * p.sl2 * s : L * 0.92;
+  const tip2 = o.twin ? { x: lH.x + Math.cos(sa2) * L2, y: lH.y + Math.sin(sa2) * L2 } : null;
   ctx.save(); ctx.globalAlpha = o.alpha ?? 1; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   const limbs = () => { ctx.beginPath(); for (const ch of [[lHip, lK, lF], [rHip, rK, rF], [lS, lE, lH], [rS, rE, rH]]) { ctx.moveTo(ch[0].x, ch[0].y); ctx.lineTo(ch[1].x, ch[1].y); ctx.lineTo(ch[2].x, ch[2].y); } };
   const torso = () => { ctx.beginPath(); ctx.moveTo(lHip.x, lHip.y); ctx.lineTo(rHip.x, rHip.y); ctx.lineTo(rS.x, rS.y); ctx.lineTo(lS.x, lS.y); ctx.closePath(); };
@@ -122,7 +123,7 @@ export class BossFight {
     this.bossHP = BOSS.hp; this.bossShow = BOSS.hp; this.bossPost = 0; this.lastPost = -9; this.nextPlan = 0; this.openings = []; this.knock = null;
     this.brokenAt = 0; this.alt = 1;
     this.pHP = hp; this.pShow = hp; this.pPost = 0;
-    this.player = { move: null, guardUntil: -9, blockKind: 'slash', atk: null, atkReady: 0, lockUntil: 0, stunUntil: 0, hurtUntil: 0, heal: null, focusUntil: 0, riposteUntil: 0, pose: { ...PP.idle }, x: 0, y: 360, s: 1.25, sideDir: 1, ghosts: [] };
+    this.player = { move: null, guardUntil: -9, blockKind: 'slash', atk: null, atkReady: 0, lockUntil: 0, stunUntil: 0, hurtUntil: 0, heal: null, focusUntil: 0, riposteUntil: 0, pose: { ...PP.idle }, x: 0, y: 0, s: 1, sideDir: 1, ghosts: [] };
     this.boss = { pose: { ...BP.idle }, x: 0, y: 0, s: 1, flinchUntil: 0, recoil: null };
     this.banner = null; this.grade = null; this.result = null;
     this.q = 1; this.makeBG();
@@ -332,10 +333,8 @@ export class BossFight {
     const t = this.t, p = this.player, adt = this.hitstop > 0 ? 0 : dt;
     this.hitstop = Math.max(0, this.hitstop - dt);
     if (this.mode === 'intro') {
-      const k = t / 3.2;
-      p.y = 360 * (1 - smooth(clamp(t / 1.6, 0, 1))); p.s = 1 + 0.25 * (1 - smooth(clamp(t / 1.6, 0, 1)));
-      if (t > 0.4 && !this.introBanner) { this.introBanner = true; this.showBanner(BOSS.name, BOSS.sub, '#ffffff', 2.6); }
-      if (k >= 1 || this.skipIntro) { this.mode = 'play'; p.y = 0; p.s = 1; this.nextPlan = t + 0.6; }
+      if (t > 1.8 && !this.introBanner) { this.introBanner = true; this.showBanner(BOSS.name, BOSS.sub, '#ffffff', 2.8); }
+      if (t >= INTRO || this.skipIntro) { this.mode = 'play'; this.nextPlan = t + 0.6; }
     }
     if (this.mode === 'play') {
       if (t >= this.nextPlan && !this.cond.notes.some((n) => !n.applied)) this.plan();
@@ -425,7 +424,7 @@ export class BossFight {
   bossTarget() {
     const t = this.t, b = this.boss;
     const at = (k, rate, extra) => { const o = BOFF[k]; return { pose: BP[k], x: o[0], y: o[1], s: o[2], rate, sway: 1, ...extra }; };
-    if (this.mode === 'intro') return at(t > 1 && t < 2.4 ? 'flourish' : 'idle', 5);
+    if (this.mode === 'intro') return at(t > 1.9 && t < 3.8 ? 'flourish' : 'idle', 4);
     if (this.mode === 'over' && this.result === 'win') return at('broken', 6, { sway: 0.2 });
     if (this.mode === 'broken') return at('broken', 10, { sway: 0.5 });
     if (t < b.flinchUntil) return { pose: BP.hurt, x: b.x + 6, y: b.y - 4, s: b.s, rate: 30, sway: 0 };
@@ -477,6 +476,88 @@ export class BossFight {
   showBanner(s, sub, c, dur = 1.4) { this.banner = { s, sub, c, t0: performance.now() / 1000, dur }; }
   gradeText(s, c) { this.grade = { s, c, t0: this.t }; }
 
+  /* ---------- the opening shot: a slow orbit from side-on to behind you ---------- */
+  introCam() {
+    const t = this.t;
+    const eR = easeIO(clamp((t - 0.15) / 5.25, 0, 1)), eD = easeIO(clamp(t / 4.9, 0, 1));
+    const phi = -Math.PI / 2 * (1 - eR);
+    const tx = mix(IC.mid.x, 0, eD), tz = mix(IC.mid.z, IC.pz, eD), d = mix(IC.d0, IC.pz, eD);
+    const fx = Math.sin(phi), fz = Math.cos(phi);
+    return { x: tx - d * fx, y: mix(IC.h0, IC.h, eD), z: tz - d * fz, fx, fz, rx: fz, rz: -fx, eR };
+  }
+  renderIntro(ctx, Q) {
+    CTX = ctx;
+    if (this.q !== Q) { this.q = Q; this.makeBG(); }
+    ctx.setTransform(Q, 0, 0, Q, 0, 0);
+    const cam = this.introCam(), t = this.t, w = this.w, P = (X, Y, Z) => project(cam, X, Y, Z);
+    // sky and floor (the horizon stays put: the camera only turns, never tilts)
+    let gr = ctx.createLinearGradient(0, 0, 0, HORIZON);
+    gr.addColorStop(0, '#000201'); gr.addColorStop(0.7, '#021209'); gr.addColorStop(1, '#063a22');
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, W, HORIZON);
+    gr = ctx.createLinearGradient(0, HORIZON, 0, H); gr.addColorStop(0, '#021a0e'); gr.addColorStop(1, '#000503');
+    ctx.fillStyle = gr; ctx.fillRect(0, HORIZON, W, H - HORIZON);
+    // the ring of pylons, far to near
+    const py = [];
+    for (let i = 0; i < 96; i++) {
+      const a = (i / 96) * 6.283 + 0.02, X = IC.mid.x + Math.cos(a) * 3200, Z = IC.mid.z + Math.sin(a) * 3200;
+      const b = P(X, 0, Z); if (b.z < 200) continue;
+      b.y = HORIZON; py.push({ b, h: 380 + ((i * 37) % 60) * 3.4, w: 56 + (i % 3) * 14 });
+    }
+    py.sort((p1, p2) => p2.b.z - p1.b.z);
+    for (const q of py) {
+      const s = q.b.s, x = q.b.x, top = q.b.y - q.h * s, hw = q.w * s / 2;
+      if (x + hw < -40 || x - hw > W + 40) continue;
+      ctx.fillStyle = '#010b06'; ctx.fillRect(x - hw, top, hw * 2, q.h * s);
+      ctx.strokeStyle = 'rgba(61,255,154,.35)'; ctx.lineWidth = 1.5; ctx.strokeRect(x - hw, top, hw * 2, q.h * s);
+      ctx.fillStyle = 'rgba(25,224,176,.6)'; ctx.fillRect(x - 1, top - 80 * s, 2, 80 * s);
+    }
+    const hz = ctx.createLinearGradient(0, HORIZON - 40, 0, HORIZON + 10);
+    hz.addColorStop(0, 'rgba(61,255,154,0)'); hz.addColorStop(1, 'rgba(61,255,154,.35)');
+    ctx.fillStyle = hz; ctx.fillRect(0, HORIZON - 40, W, 50);
+    // the floor grid, clipped at the lens
+    ctx.strokeStyle = 'rgba(61,255,154,.3)'; ctx.lineWidth = 1.2; ctx.beginPath();
+    const G = 101, N = 34, cx = 0, cz = IC.mid.z;
+    for (let i = -N; i <= N; i++) {
+      seg3(ctx, cam, cx + i * G, cz - N * G, cx + i * G, cz + N * G);
+      seg3(ctx, cam, cx - N * G, cz + i * G, cx + N * G, cz + i * G);
+    }
+    ctx.stroke();
+    // distance haze over the grid's far lines
+    gr = ctx.createLinearGradient(0, HORIZON, 0, HORIZON + 80);
+    gr.addColorStop(0, 'rgba(2,26,14,.85)'); gr.addColorStop(1, 'rgba(2,26,14,0)');
+    ctx.fillStyle = gr; ctx.fillRect(0, HORIZON, W, 80);
+    // the duel circle
+    ctx.beginPath(); let pen = false;
+    for (let i = 0; i <= 72; i++) {
+      const a = (i / 72) * 6.283, q = P(Math.cos(a) * RING.rx, 0, RING.z + Math.sin(a) * RING.rz);
+      if (q.z < 40) { pen = false; continue; }
+      if (pen) ctx.lineTo(q.x, q.y); else { ctx.moveTo(q.x, q.y); pen = true; }
+    }
+    ctx.strokeStyle = 'rgba(25,224,176,.18)'; ctx.lineWidth = 14; ctx.stroke();
+    ctx.strokeStyle = 'rgba(25,224,176,.7)'; ctx.lineWidth = 3; ctx.stroke();
+    // the two of you, nearer one last
+    const b = this.boss, p = this.player, bm = mix(IC.bm0, IC.bm, Math.pow(cam.eR, 1.4)) * b.s;
+    const figs = [
+      { world: { x: IC.bx + b.x / IC.bk, y: -b.y / IC.bk, z: IC.bz }, pose: b.pose, face: -1, m: bm, zd: BZD, o: { view: 'front', color: BOSS_C, rgb: BOSS_RGB, headR: 15, sword: 150, bladeW: 4.5, twin: true } },
+      { world: { x: IC.px, y: 0, z: IC.pz }, pose: p.pose, face: 1, m: 1, zd: PZD, o: { view: 'back', color: PLAYER_C, rgb: PLAYER_RGB, headR: 13, sword: 96 * w.len / 60, bladeW: w.width + 1.2, twin: w.twin, blade: '#dffcff' } },
+    ].map((f) => ({ ...f, base: P(f.world.x, f.world.y, f.world.z) })).filter((f) => f.base.z > 60).sort((f1, f2) => f2.base.z - f1.base.z);
+    for (const f of figs) {
+      const s = f.base.s * f.m, rx = 46 * s, ry = rx * clamp(cam.y / f.base.z, 0.12, 0.6);
+      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.ellipse(f.base.x, f.base.y + 2, rx, ry, 0, 0, 6.283); ctx.fill();
+      if (f.face < 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25; ctx.drawImage(glowSprite('#19e0b0'), f.base.x - 2 * rx, f.base.y - ry * 2, 4 * rx, ry * 4); ctx.restore(); }
+      drawRig(ctx, { ...f.o, ...figure3D(cam, f) });
+    }
+    // drifting motes: their parallax sells the turn
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const m of MOTES) {
+      const y = (m.y + t * m.v) % 520, q = P(m.x, y, m.z); if (q.z < 60) continue;
+      const r = clamp(2.6 * q.s, 0.7, 4); ctx.globalAlpha = clamp(m.a * Math.min(1, (520 - y) / 120) * Math.min(1, q.s * 2) * clamp(1.6 - q.s, 0, 1), 0, 1);
+      ctx.drawImage(glowSprite(m.c), q.x - r * 3, q.y - r * 3, r * 6, r * 6);
+    }
+    ctx.restore();
+    ctx.setTransform(1, 0, 0, 1, 0, 0); drawVignette(ctx, this.vig); ctx.setTransform(Q, 0, 0, Q, 0, 0);
+  }
+
   /* ---------- drawing ---------- */
   makeBG() {
     const q = this.q || 1;
@@ -515,6 +596,22 @@ export class BossFight {
   }
 
   render(ctx, Q = 1) {
+    if (this.mode !== 'intro') { this.renderDuel(ctx, Q); return; }
+    this.renderIntro(ctx, Q);
+    // the last moments: the orbit has landed on the duel's own framing, so cross into the real view
+    const a = clamp((this.t - (INTRO - BLEND)) / BLEND, 0, 1);
+    if (a > 0) {
+      const off = this.off || (this.off = document.createElement('canvas'));
+      if (off.width !== ctx.canvas.width || off.height !== ctx.canvas.height) { off.width = ctx.canvas.width; off.height = ctx.canvas.height; }
+      this.renderDuel(off.getContext('2d', { alpha: false }), Q, true);
+      CTX = ctx; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = smooth(a); ctx.drawImage(off, 0, 0); ctx.globalAlpha = 1;
+    }
+    ctx.setTransform(Q, 0, 0, Q, 0, 0);
+    const bars = 64 * (1 - smooth(clamp((this.t - (INTRO - 0.8)) / 0.8, 0, 1)));
+    if (bars > 0.5) { ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, bars); ctx.fillRect(0, H - bars, W, bars); }
+    this.drawBanner(ctx);
+  }
+  renderDuel(ctx, Q = 1, intro = false) {
     CTX = ctx;
     if (this.q !== Q) { this.q = Q; this.makeBG(); }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -529,8 +626,7 @@ export class BossFight {
     drawVignette(ctx, this.vig);
     ctx.setTransform(Q, 0, 0, Q, 0, 0);
     if (this.flash) { ctx.fillStyle = `rgba(${this.flash.c},${Math.max(0, this.flash.a)})`; ctx.fillRect(0, 0, W, H); }
-    this.drawHUD(ctx);
-    if (this.t < 0.6) { ctx.fillStyle = `rgba(255,255,255,${1 - this.t / 0.6})`; ctx.fillRect(0, 0, W, H); }
+    this.drawHUD(ctx, intro);
   }
   drawWorld(ctx) {
     const b = this.bossPos(), p = this.player, w = this.w;
@@ -620,8 +716,8 @@ export class BossFight {
     ctx.globalAlpha = a; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 6; path(); ctx.stroke();
     ctx.restore();
   }
-  drawHUD(ctx) {
-    const s = this.g.save, mh = maxHP(s.stats), now = performance.now() / 1000;
+  drawHUD(ctx, intro) {
+    const s = this.g.save, mh = maxHP(s.stats);
     txt(BOSS.name, W / 2, 30, 20, '#ffffff', 'center', 800);
     bar(ctx, W / 2 - 300, 50, 600, 9, this.bossHP / BOSS.hp, '#f2fbff', 'rgba(255,255,255,.1)');
     for (let i = 0; i < BOSS.phases.length; i++) {
@@ -644,6 +740,10 @@ export class BossFight {
     }
     txt(this.w.name.toUpperCase(), W - 40, H - 40, 13, '#dffbea', 'right');
     txt(btn('dodge') + ' / ←→ step   ' + btn('jump') + ' jump   ' + btn('duck') + ' duck   ' + btn('block') + ' block   ' + btn('attack') + ' strike', W - 40, H - 20, 11, 'rgba(223,251,234,.45)', 'right', 600);
+    if (!intro) this.drawBanner(ctx);
+  }
+  drawBanner(ctx) {
+    const now = performance.now() / 1000;
     if (this.banner) {
       const age = now - this.banner.t0, d = this.banner.dur;
       if (age < d) {
@@ -672,3 +772,57 @@ function withGuard(base, g) {
   for (const k of ARM) r[k] = g[k] + (k.endsWith('x') ? dx : dy);
   r.sa = g.sa; r.sl = g.sl; return r;
 }
+
+/* ---------- the intro's camera: a pinhole that turns about a point and never tilts ---------- */
+const FOC = 900;
+// placed so that, from straight behind, everything lands where the duel draws it
+const IC = (() => {
+  const pz = FOC / PS, h = (PY - HORIZON) / PS, px = (PX - VPX) / PS;
+  const bz = FOC * h / (BY - HORIZON), bk = FOC / bz, bx = (BXc - VPX) / bk;
+  return { pz, h, px, bz, bk, bx, bm: BS / bk, bm0: 1.25, mid: { x: (px + bx) / 2, z: (pz + bz) / 2 }, d0: 1250, h0: 330 };
+})();
+const mix = (a, b, k) => a + (b - a) * k;
+const easeIO = (k) => 0.5 - 0.5 * Math.cos(Math.PI * k);
+function project(c, X, Y, Z) {
+  const dx = X - c.x, dz = Z - c.z, z = dx * c.fx + dz * c.fz, s = FOC / z;
+  return { x: VPX + (dx * c.rx + dz * c.rz) * s, y: HORIZON - (Y - c.y) * s, z, s };
+}
+/** A floor line, cut where it passes behind the lens. */
+function seg3(ctx, c, x0, z0, x1, z1) {
+  const NEAR = 30, d0 = (x0 - c.x) * c.fx + (z0 - c.z) * c.fz, d1 = (x1 - c.x) * c.fx + (z1 - c.z) * c.fz;
+  if (d0 < NEAR && d1 < NEAR) return;
+  if (d0 < NEAR) { const k = (NEAR - d0) / (d1 - d0); x0 += (x1 - x0) * k; z0 += (z1 - z0) * k; }
+  else if (d1 < NEAR) { const k = (NEAR - d1) / (d0 - d1); x1 += (x0 - x1) * k; z1 += (z0 - z1) * k; }
+  const a = project(c, x0, 0, z0), b = project(c, x1, 0, z1);
+  ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+}
+// how far each joint sits in front of the body, so the figures have depth when seen side-on
+const PZD = { hip: 0, chest: 2, head: 6, lS: -4, rS: -4, lE: 16, rE: 18, lH: 34, rH: 36, lK: 10, rK: 12, lF: -16, rF: 18 };
+const BZD = { hip: 0, chest: 4, head: 8, lS: -2, rS: -2, lE: 20, rE: 20, lH: 38, rH: 38, lK: 10, rK: 10, lF: -18, rF: 20 };
+const JOINTS = Object.keys(PZD);
+/** A flat front/back pose stood up in the arena and photographed from the intro camera. */
+function figure3D(c, f) {
+  const P = f.pose, B = f.base, m = f.m, s = B.s * m, W3 = f.world, dk = 1 - 0.9 * c.eR * c.eR;   // depth fades as we come round behind
+  const out = {}, J = {};
+  const at = (k) => ({ x: W3.x + P[k + 'x'] * m, y: W3.y - P[k + 'y'] * m, z: W3.z + f.face * f.zd[k] * m * dk });
+  for (const k of JOINTS) {
+    const w = at(k), q = project(c, w.x, w.y, w.z);
+    J[k] = q; out[k + 'x'] = (q.x - B.x) / s; out[k + 'y'] = (q.y - B.y) / s;
+  }
+  const blade = (hand, dx, dy, len) => {
+    const h = J[hand], L = f.o.sword * len * m, wh = at(hand);
+    const tip = project(c, wh.x + dx * L, wh.y - dy * L, wh.z + f.face * 0.35 * dk * L);
+    return [Math.atan2(tip.y - h.y, tip.x - h.x), Math.hypot(tip.x - h.x, tip.y - h.y) / (f.o.sword * s)];
+  };
+  [out.sa, out.sl] = blade('rH', Math.cos(P.sa), Math.sin(P.sa), P.sl);
+  if (f.o.twin) [out.sa2, out.sl2] = blade('lH', -Math.cos(P.sa), Math.sin(P.sa), P.sl * 0.92);
+  return { pose: out, x: B.x, y: B.y, s };
+}
+const MOTES = Array.from({ length: 70 }, (_, i) => {
+  const r = (n) => { const v = Math.sin(i * 127.1 + n * 311.7) * 43758.5453; return v - Math.floor(v); };
+  const a = r(1) * 6.283, d = 200 + r(2) * 1500;
+  return { x: IC.mid.x + Math.cos(a) * d, z: IC.mid.z + Math.sin(a) * d, y: r(3) * 520, v: 12 + r(4) * 26, a: 0.25 + r(5) * 0.5, c: r(6) < 0.3 ? '#bff9ff' : '#3dff9a' };
+});
+// the floor ring that, from behind, sits where the duel's painted ellipse is
+const RING = (() => { const zn = FOC * IC.h / (H - 10 - HORIZON), zf = FOC * IC.h / (410 - HORIZON); return { z: (zn + zf) / 2, rz: (zf - zn) / 2, rx: 1.22 * 560 * IC.h / 260 }; })();
+const INTRO = 6, BLEND = 0.5;
