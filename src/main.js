@@ -47,7 +47,7 @@ const game = {
     this.world.spawn(s.beacon);
   },
   startBoss() {
-    this.boss = new BossFight(this, this.world.p.hp);
+    this.boss = new BossFight(this, this.world.p.hp, this.world.snapshot());
     this.scene = 'boss';
     playMusic('boss', 0);
   },

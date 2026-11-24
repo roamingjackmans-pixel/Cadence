@@ -663,7 +663,7 @@ export class World {
 
   /* ---------- drawing ---------- */
   render(ctx, Q = 1) {
-    CTX = ctx;
+    CTX = ctx; this.Q = Q;
     const cam = this.cam, art = this.art;
     art.setScale(Q);
     const sx = (Math.random() - 0.5) * this.shake * 2, sy = (Math.random() - 0.5) * this.shake * 2;
@@ -677,7 +677,7 @@ export class World {
     ctx.setTransform(S, 0, 0, S, -ox, -oy);
     this.drawProps(ctx);
     for (const e of this.enemies) if (!e.dead && this.onScreen(e.x, e.y)) this.drawEnemy(ctx, e);
-    this.drawPlayer(ctx);
+    if (!this.hideFigs) this.drawPlayer(ctx);
     this.fx.draw(ctx, txt);
     for (const e of this.enemies) if (!e.dead && this.onScreen(e.x, e.y)) this.drawEnemyUI(ctx, e);
     this.drawPrompt(ctx);
@@ -686,7 +686,19 @@ export class World {
     drawVignette(ctx, art.vig);
     ctx.setTransform(Q, 0, 0, Q, 0, 0);
     if (this.flash) { ctx.fillStyle = `rgba(${this.flash.c},${Math.max(0, this.flash.a)})`; ctx.fillRect(0, 0, W, H); }
-    this.drawHUD(ctx);
+    if (!this.hideFigs) this.drawHUD(ctx);
+  }
+  /** The last frame of the walk in, twice (as seen, and without the figures or HUD), plus where the two figures stand
+   *  on screen: the duel's opening shot starts from exactly this picture and turns it into the arena. */
+  snapshot() {
+    const Q = this.Q || 1, shot = (bare) => {
+      const c = document.createElement('canvas'); c.width = Math.round(W * Q); c.height = Math.round(H * Q);
+      const g = c.getContext('2d', { alpha: false }); g.setTransform(Q, 0, 0, Q, 0, 0);
+      const sh = this.shake; this.shake = 0; this.hideFigs = bare; this.render(g, Q); this.hideFigs = false; this.shake = sh;
+      return c;
+    };
+    const p = this.p, A = this.L.arena, cam = this.cam, at = (x, y) => ({ x: (x - cam.x) * Z, y: (y - cam.y) * Z });
+    return { full: shot(false), back: shot(true), player: { ...at(p.x, p.y), h: 0.62 * 96 * Z }, boss: { ...at(A.bossX, A.floor), h: 0.86 * 96 * Z } };
   }
   onScreen(x, y) { return x > this.cam.x - 200 && x < this.cam.x + VW + 200 && y > this.cam.y - 100 && y < this.cam.y + VH + 200; }
 
@@ -721,7 +733,7 @@ export class World {
     const D = L.bossDoor;
     if (L.tiles[30 * L.cols + D.c] === 3 && this.onScreen(D.x, D.y0)) this.drawBars(ctx, D.x, D.y0, D.y1, '#ffffff', true);
     // the boss waiting in the arena during the walk in
-    if (this.cut || (!s.bossDead && this.onScreen(L.arena.bossX, L.arena.floor))) {
+    if (!this.hideFigs && (this.cut || (!s.bossDead && this.onScreen(L.arena.bossX, L.arena.floor)))) {
       const fig = { pose: POSES.idle, x: L.arena.bossX, y: L.arena.floor, s: 0.86, face: -1, color: '#ffffff', rgb: '255,255,255', weapon: { len: 52, width: 3, claw: true }, body: 6, alpha: this.cut ? 1 : 0.5 };
       drawFigure(ctx, fig);
     }

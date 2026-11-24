@@ -113,7 +113,7 @@ function drawRig(ctx, o) {
 }
 
 export class BossFight {
-  constructor(game, hp) {
+  constructor(game, hp, snap) {
     this.g = game;
     const s = game.save;
     this.w = WEAPONS[s.equipped];
@@ -127,6 +127,7 @@ export class BossFight {
     this.boss = { pose: { ...BP.idle }, x: 0, y: 0, s: 1, flinchUntil: 0, recoil: null };
     this.banner = null; this.grade = null; this.result = null;
     this.q = 1; this.makeBG();
+    this.snap = snap || null; this.introStart(this.snap);
   }
 
   win(action, type) {
@@ -477,31 +478,72 @@ export class BossFight {
   gradeText(s, c) { this.grade = { s, c, t0: this.t }; }
 
   /* ---------- the opening shot: a slow orbit from side-on to behind you ---------- */
-  introCam() {
-    const t = this.t;
-    const eR = easeIO(clamp((t - 0.15) / 5.25, 0, 1)), eD = easeIO(clamp(t / 4.9, 0, 1));
+  /** Where the opening shot starts: side-on, from wherever puts the two of you exactly where the walk in left you. */
+  introStart(snap) {
+    const S = { tz: IC.mid.z, d: IC.d0, h: IC.h0 };
+    if (snap) {
+      const u = snap.player.x - VPX, v = snap.boss.x - VPX;
+      if (v - u > 60) {
+        const A = Math.max(IC.bx + 600, (FOC * (IC.bz - IC.pz) + v * IC.bx - u * IC.px) / (v - u));
+        S.tz = IC.pz - u * (A - IC.px) / FOC; S.d = A - IC.mid.x; S.h = clamp((snap.player.y - HORIZON) * (A - IC.px) / FOC, 120, 1400);
+      }
+    }
+    this.ic0 = S;
+    if (!snap) return;
+    // what's left over (sizes, the boss's floor line) is taken up on screen and let go as the camera turns
+    const c = this.introCam(0), fix = (X, Z, m, at, tall) => { const q = project(c, X, 0, Z); return { dx: at.x - q.x, dy: at.y - q.y, k: (at.h / tall) / (q.s * m) }; };
+    this.fix = { player: fix(IC.px, IC.pz, 1, snap.player, 191), boss: fix(IC.bx, IC.bz, IC.bm0, snap.boss, 209) };
+    // the play area becomes a flat standing where you both stand (so its floor stays under your feet), filling the view
+    const D = c.x - IC.mid.x;
+    this.flat = { x: IC.mid.x, z0: c.z - VPX * D / FOC, z1: c.z + (W - VPX) * D / FOC, y1: c.y + HORIZON * D / FOC, y0: c.y - (H - HORIZON) * D / FOC };
+  }
+  introCam(t = this.t) {
+    const S = this.ic0;
+    const eR = easeIO(clamp((t - 0.15) / 5.25, 0, 1)), eD = easeIO(clamp(t / 5.1, 0, 1));
     const phi = -Math.PI / 2 * (1 - eR);
-    const tx = mix(IC.mid.x, 0, eD), tz = mix(IC.mid.z, IC.pz, eD), d = mix(IC.d0, IC.pz, eD);
+    const tx = mix(IC.mid.x, 0, eD), tz = mix(S.tz, IC.pz, eD), d = mix(S.d, IC.pz, eD);
     const fx = Math.sin(phi), fz = Math.cos(phi);
-    return { x: tx - d * fx, y: mix(IC.h0, IC.h, eD), z: tz - d * fz, fx, fz, rx: fz, rz: -fx, eR };
+    return { x: tx - d * fx, y: mix(S.h, IC.h, eD), z: tz - d * fz, fx, fz, rx: fz, rz: -fx, eR };
+  }
+  /** A picture on the flat, cut into thin upright strips so it turns in true perspective. */
+  drawFlat(ctx, cam, img, a) {
+    const F = this.flat, N = 72, iw = img.width, ih = img.height;
+    ctx.save(); ctx.globalAlpha = a;
+    let prev = null;
+    for (let i = 0; i <= N; i++) {
+      const z = mix(F.z0, F.z1, i / N), top = project(cam, F.x, F.y1, z), bot = project(cam, F.x, F.y0, z);
+      const cur = { x: top.x, top: top.y, bot: bot.y, ok: top.z > 30 };
+      if (prev && cur.ok && prev.ok) {
+        const dw = cur.x - prev.x, y0 = (prev.top + cur.top) / 2, y1 = (prev.bot + cur.bot) / 2;
+        if (dw > 0 && prev.x < W && cur.x > 0) ctx.drawImage(img, (i - 1) / N * iw, 0, iw / N, ih, prev.x, y0, dw + 0.8, y1 - y0);
+      }
+      prev = cur;
+    }
+    ctx.restore();
   }
   renderIntro(ctx, Q) {
     CTX = ctx;
     if (this.q !== Q) { this.q = Q; this.makeBG(); }
     ctx.setTransform(Q, 0, 0, Q, 0, 0);
-    const cam = this.introCam(), t = this.t, w = this.w, P = (X, Y, Z) => project(cam, X, Y, Z);
+    const cam = this.introCam(), t = this.t, w = this.w, P = (X, Y, Z) => project(cam, X, Y, Z), snap = this.snap;
+    // the morph: the walk in's own picture gives way to the play area as a flat, which swings off as the arena comes up
+    const aS = snap ? 1 - smooth(clamp(t / 0.8, 0, 1)) : 0;
+    const aW = snap ? 1 - smooth(clamp((t - 0.6) / 2.2, 0, 1)) : 0;
+    const aA = snap ? smooth(clamp((t - 0.15) / 2.3, 0, 1)) : 1;
+    ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = aA;
     // sky and floor (the horizon stays put: the camera only turns, never tilts)
     let gr = ctx.createLinearGradient(0, 0, 0, HORIZON);
     gr.addColorStop(0, '#000201'); gr.addColorStop(0.7, '#021209'); gr.addColorStop(1, '#063a22');
     ctx.fillStyle = gr; ctx.fillRect(0, 0, W, HORIZON);
     gr = ctx.createLinearGradient(0, HORIZON, 0, H); gr.addColorStop(0, '#021a0e'); gr.addColorStop(1, '#000503');
     ctx.fillStyle = gr; ctx.fillRect(0, HORIZON, W, H - HORIZON);
-    // the ring of pylons, far to near
+    // the ring of pylons, far to near, standing on the horizon like the duel's backdrop
     const py = [];
     for (let i = 0; i < 96; i++) {
-      const a = (i / 96) * 6.283 + 0.02, X = IC.mid.x + Math.cos(a) * 3200, Z = IC.mid.z + Math.sin(a) * 3200;
-      const b = P(X, 0, Z); if (b.z < 200) continue;
-      b.y = HORIZON; py.push({ b, h: 380 + ((i * 37) % 60) * 3.4, w: 56 + (i % 3) * 14 });
+      const a = (i / 96) * 6.283 + 0.02, X = IC.mid.x + Math.cos(a) * 5000, Z = IC.mid.z + Math.sin(a) * 5000;
+      const b = P(X, 0, Z); if (b.z < 300) continue;
+      b.y = HORIZON; py.push({ b, h: (380 + ((i * 37) % 60) * 3.4) * 1.56, w: (56 + (i % 3) * 14) * 1.56 });
     }
     py.sort((p1, p2) => p2.b.z - p1.b.z);
     for (const q of py) {
@@ -509,14 +551,14 @@ export class BossFight {
       if (x + hw < -40 || x - hw > W + 40) continue;
       ctx.fillStyle = '#010b06'; ctx.fillRect(x - hw, top, hw * 2, q.h * s);
       ctx.strokeStyle = 'rgba(61,255,154,.35)'; ctx.lineWidth = 1.5; ctx.strokeRect(x - hw, top, hw * 2, q.h * s);
-      ctx.fillStyle = 'rgba(25,224,176,.6)'; ctx.fillRect(x - 1, top - 80 * s, 2, 80 * s);
+      ctx.fillStyle = 'rgba(25,224,176,.6)'; ctx.fillRect(x - 1, top - 125 * s, 2, 125 * s);
     }
     const hz = ctx.createLinearGradient(0, HORIZON - 40, 0, HORIZON + 10);
     hz.addColorStop(0, 'rgba(61,255,154,0)'); hz.addColorStop(1, 'rgba(61,255,154,.35)');
     ctx.fillStyle = hz; ctx.fillRect(0, HORIZON - 40, W, 50);
     // the floor grid, clipped at the lens
     ctx.strokeStyle = 'rgba(61,255,154,.3)'; ctx.lineWidth = 1.2; ctx.beginPath();
-    const G = 101, N = 34, cx = 0, cz = IC.mid.z;
+    const G = 101, N = 46, cx = 0, cz = IC.mid.z;
     for (let i = -N; i <= N; i++) {
       seg3(ctx, cam, cx + i * G, cz - N * G, cx + i * G, cz + N * G);
       seg3(ctx, cam, cx - N * G, cz + i * G, cx + N * G, cz + i * G);
@@ -535,27 +577,37 @@ export class BossFight {
     }
     ctx.strokeStyle = 'rgba(25,224,176,.18)'; ctx.lineWidth = 14; ctx.stroke();
     ctx.strokeStyle = 'rgba(25,224,176,.7)'; ctx.lineWidth = 3; ctx.stroke();
-    // the two of you, nearer one last
+    ctx.globalAlpha = 1;
+    // the play area, turning away
+    if (aW > 0.003) {
+      this.drawFlat(ctx, cam, snap.back, aW);
+      if (aS > 0.003) this.drawFlat(ctx, cam, snap.full, aW * aS);
+    }
+    // the two of you, nearer one last; at first pinned to where the walk in left you, then let go
     const b = this.boss, p = this.player, bm = mix(IC.bm0, IC.bm, Math.pow(cam.eR, 1.4)) * b.s;
+    const fk = this.fix ? 1 - smooth(clamp(t / 2.6, 0, 1)) : 0;
     const figs = [
-      { world: { x: IC.bx + b.x / IC.bk, y: -b.y / IC.bk, z: IC.bz }, pose: b.pose, face: -1, m: bm, zd: BZD, o: { view: 'front', color: BOSS_C, rgb: BOSS_RGB, headR: 15, sword: 150, bladeW: 4.5, twin: true } },
-      { world: { x: IC.px, y: 0, z: IC.pz }, pose: p.pose, face: 1, m: 1, zd: PZD, o: { view: 'back', color: PLAYER_C, rgb: PLAYER_RGB, headR: 13, sword: 96 * w.len / 60, bladeW: w.width + 1.2, twin: w.twin, blade: '#dffcff' } },
+      { key: 'boss', world: { x: IC.bx + b.x / IC.bk, y: -b.y / IC.bk, z: IC.bz }, pose: b.pose, face: -1, m: bm, zd: BZD, o: { view: 'front', color: BOSS_C, rgb: BOSS_RGB, headR: 15, sword: 150, bladeW: 4.5, twin: true } },
+      { key: 'player', world: { x: IC.px, y: 0, z: IC.pz }, pose: p.pose, face: 1, m: 1, zd: PZD, o: { view: 'back', color: PLAYER_C, rgb: PLAYER_RGB, headR: 13, sword: 96 * w.len / 60, bladeW: w.width + 1.2, twin: w.twin, blade: '#dffcff' } },
     ].map((f) => ({ ...f, base: P(f.world.x, f.world.y, f.world.z) })).filter((f) => f.base.z > 60).sort((f1, f2) => f2.base.z - f1.base.z);
     for (const f of figs) {
-      const s = f.base.s * f.m, rx = 46 * s, ry = rx * clamp(cam.y / f.base.z, 0.12, 0.6);
-      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.ellipse(f.base.x, f.base.y + 2, rx, ry, 0, 0, 6.283); ctx.fill();
-      if (f.face < 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25; ctx.drawImage(glowSprite('#19e0b0'), f.base.x - 2 * rx, f.base.y - ry * 2, 4 * rx, ry * 4); ctx.restore(); }
-      drawRig(ctx, { ...f.o, ...figure3D(cam, f) });
+      const r = figure3D(cam, f), fx = this.fix && this.fix[f.key];
+      if (fx && fk > 0) { r.x += fx.dx * fk; r.y += fx.dy * fk; r.s *= Math.pow(fx.k, fk); }
+      const fa = 1 - aS, rx = 46 * r.s, ry = rx * clamp(cam.y / f.base.z, 0.12, 0.6);
+      ctx.globalAlpha = fa; ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.ellipse(r.x, r.y + 2, rx, ry, 0, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+      if (f.face < 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25 * fa * aA; ctx.drawImage(glowSprite('#19e0b0'), r.x - 2 * rx, r.y - ry * 2, 4 * rx, ry * 4); ctx.restore(); }
+      if (fa > 0.003) drawRig(ctx, { ...f.o, ...r, alpha: fa });
     }
     // drifting motes: their parallax sells the turn
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     for (const m of MOTES) {
       const y = (m.y + t * m.v) % 520, q = P(m.x, y, m.z); if (q.z < 60) continue;
-      const r = clamp(2.6 * q.s, 0.7, 4); ctx.globalAlpha = clamp(m.a * Math.min(1, (520 - y) / 120) * Math.min(1, q.s * 2) * clamp(1.6 - q.s, 0, 1), 0, 1);
+      const r = clamp(2.6 * q.s, 0.7, 4); ctx.globalAlpha = aA * clamp(m.a * Math.min(1, (520 - y) / 120) * Math.min(1, q.s * 2) * clamp(1.6 - q.s, 0, 1), 0, 1);
       ctx.drawImage(glowSprite(m.c), q.x - r * 3, q.y - r * 3, r * 6, r * 6);
     }
     ctx.restore();
-    ctx.setTransform(1, 0, 0, 1, 0, 0); drawVignette(ctx, this.vig); ctx.setTransform(Q, 0, 0, Q, 0, 0);
+    // the walk in had its own vignette baked in; ours comes up as that picture goes
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1 - aS * aW; drawVignette(ctx, this.vig); ctx.globalAlpha = 1; ctx.setTransform(Q, 0, 0, Q, 0, 0);
   }
 
   /* ---------- drawing ---------- */
@@ -607,7 +659,7 @@ export class BossFight {
       CTX = ctx; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = smooth(a); ctx.drawImage(off, 0, 0); ctx.globalAlpha = 1;
     }
     ctx.setTransform(Q, 0, 0, Q, 0, 0);
-    const bars = 64 * (1 - smooth(clamp((this.t - (INTRO - 0.8)) / 0.8, 0, 1)));
+    const bars = 64 * (this.snap ? smooth(clamp((this.t - 0.3) / 1.2, 0, 1)) : 1) * (1 - smooth(clamp((this.t - (INTRO - 0.8)) / 0.8, 0, 1)));
     if (bars > 0.5) { ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, bars); ctx.fillRect(0, H - bars, W, bars); }
     this.drawBanner(ctx);
   }
