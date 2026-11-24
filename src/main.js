@@ -1,6 +1,8 @@
 // Boot, the frame loop, saving, and moving between the world, the boss duel and the menus.
 import { W, H } from './util.js';
-import { WEAPONS, WEAPON_ORDER, STATS, STAT_ORDER, BOSS, UPGRADE_MAX, upgradeCost, levelOf, levelCost, maxHP, BASE_STAT } from './data.js';
+import { WEAPONS, WEAPON_ORDER, STATS, STAT_ORDER, UPGRADE_MAX, upgradeCost, levelOf, levelCost, maxHP, BASE_STAT } from './data.js';
+import { zoneById, zoneOfBeacon, beaconIndex, LAST_ZONE } from './zones.js';
+import { T } from './level.js';
 import { input, btn } from './input.js';
 import { audioInit, sfx, playMusic, updateMusic, muffle, toggleMute, isMuted, suspendAudio } from './audio.js';
 import { World } from './world.js';
@@ -13,11 +15,21 @@ const KEY = 'cadence-save-v1';
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d', { alpha: false });
 
+// gates: shortcut gates opened; bosses: zones whose warden is dead; shade: your lost echoes {zone, x, y, amount}
 function freshSave() {
-  return { v: 1, stats: { vit: BASE_STAT, guard: BASE_STAT, str: BASE_STAT, fin: BASE_STAT, focus: BASE_STAT }, echoes: 0, upgrades: { arming: 0 }, equipped: 'arming', flasks: 3, flasksMax: 3, lit: [], beacon: 'b1', taken: [], gateOpen: false, bossDead: false, shade: null, hints: true, deaths: 0, kills: 0 };
+  return { v: 2, stats: { vit: BASE_STAT, guard: BASE_STAT, str: BASE_STAT, fin: BASE_STAT, focus: BASE_STAT }, echoes: 0, upgrades: { arming: 0 }, equipped: 'arming', flasks: 3, flasksMax: 3, lit: [], beacon: 'b1', taken: [], gates: [], bosses: [], shade: null, hints: true, deaths: 0, kills: 0 };
+}
+/** A save from before the twelve zones (v1) becomes v2: its gate, its boss, and its echoes if they still lie in the old part of the map. */
+function migrate(s) {
+  if (s.v === 1) {
+    s.gates = s.gateOpen ? ['gate1'] : []; s.bosses = s.bossDead ? [1] : [];
+    if (s.shade) s.shade = s.shade.x < 201 * T ? { ...s.shade, zone: 1 } : null;
+    delete s.gateOpen; delete s.bossDead; s.v = 2;
+  }
+  return s;
 }
 function loadSave() {
-  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.v === 1) return { ...freshSave(), ...s }; } catch (e) { /* none or blocked */ }
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && (s.v === 1 || s.v === 2)) return migrate({ ...freshSave(), ...s }); } catch (e) { /* none or blocked */ }
   return null;
 }
 let settings = { quality: 'auto' };
@@ -31,49 +43,78 @@ const game = {
   persist() { try { localStorage.setItem(KEY, JSON.stringify(this.save)); this.hasSave = true; } catch (e) { /* storage blocked: play on */ } },
 
   newGame() { this.save = freshSave(); this.persist(); this.enterWorld(); this.world.areaName = { s: 'The Verdant Circuit', t0: 0.3 }; this.world.tut = new Tutorial(this.world); },
+  /** Into the world at your last beacon, in whichever zone it is. */
   enterWorld() {
     this.menus.hideTitle(); this.menus.hide();
-    this.world = new World(this);
-    this.world.spawn(this.save.beacon);
+    this.loadZone(zoneOfBeacon(this.save.beacon), this.save.beacon);
     this.scene = 'world'; this.boss = null;
-    playMusic('explore'); muffle(false);
+    muffle(false);
+  },
+  /** Builds zone z and puts you at `where` (a beacon id, or 'entry' / 'back' from a passage). */
+  loadZone(z, where, refill = true) {
+    const hp = this.world && this.world.p && this.world.p.hp;
+    this.world = new World(this, z);
+    this.world.spawn(where, refill);
+    if (!refill && hp) this.world.p.hp = hp;
+    this.save.zone = this.world.zone.id;
+    playMusic('explore', 0, this.world.zone.music);
+  },
+  /** Walking through a passage to the next or last zone: a short dark corridor, then the new zone. */
+  changeZone(to, spawn) {
+    if (this.fade && this.fade.to) return;
+    this.fade = { t0: performance.now(), to, spawn };
+  },
+  finishZoneChange() {
+    const f = this.fade, z = zoneById(f.to);
+    this.loadZone(f.to, f.spawn, false);
+    this.persist();
+    if (f.spawn === 'entry') this.world.areaName = { s: z.name, t0: 0.2 };
+    this.fade = { t0: performance.now(), in: true };
   },
   onDeath() {
     const s = this.save, p = this.world.p;
     s.deaths++;
-    s.shade = s.echoes > 0 ? { x: p.safeX ?? p.x, y: p.safeY ?? p.y, amount: s.echoes } : null;
+    s.shade = s.echoes > 0 ? { zone: this.world.zone.id, x: p.safeX ?? p.x, y: p.safeY ?? p.y, amount: s.echoes } : null;
     s.echoes = 0;
     this.persist();
-    this.world.spawn(s.beacon);
+    if (zoneOfBeacon(s.beacon) !== this.world.zone.id) this.loadZone(zoneOfBeacon(s.beacon), s.beacon);
+    else this.world.spawn(s.beacon);
   },
   startBoss() {
-    this.boss = new BossFight(this, this.world.p.hp, this.world.snapshot());
+    const z = this.world.zone;
+    this.boss = new BossFight(this, this.world.p.hp, this.world.snapshot(), z);
     this.scene = 'boss';
-    playMusic('boss', 0);
+    playMusic('boss', 0, z.music);
   },
   onBossEnd(result, hp) {
     const s = this.save, w = this.world;
     this.scene = 'world'; this.boss = null;
+    const z = w.zone, B = z.boss;
     if (result === 'win') {
-      s.bossDead = true; s.echoes += BOSS.echoes; s.upgrades.crescent = s.upgrades.crescent || 0;
+      const first = !s.bosses.includes(z.id), rw = WEAPONS[B.reward];
+      if (first) s.bosses.push(z.id);
+      s.echoes += B.echoes; if (s.upgrades[B.reward] === undefined) s.upgrades[B.reward] = 0;
       this.persist();
       w.cut = null; w.p.hp = Math.max(1, hp); w.p.x = w.L.arena.x0 + 8 * 32; w.p.y = w.L.arena.floor;
       w.enemies.forEach((e) => { e.dead = true; });
+      w.setDoor(w.L.exitDoor, 0);
       playMusic('victory');
-      this.menu(`<h2>SECTOR CLEARED</h2>
-        <p class="sub">The Twin Dancer falls, and the Verdant Circuit goes quiet. This is the end of the first area of <b>Cadence</b>.</p>
-        <div class="wcard"><b>Crescent</b> (Sabre) is yours, and <b>${BOSS.echoes}</b> echoes. Equip it at any beacon.</div>
-        <p class="rule">You died ${s.deaths} time${s.deaths === 1 ? '' : 's'}. Keep exploring, level up, try the other blades, or start again.</p>
-        <div class="mlist"><button class="mbtn" data-act="ok">Keep exploring</button><button class="mbtn" data-act="title">Back to the title</button></div>`,
+      const done = s.bosses.length, last = z.id === LAST_ZONE;
+      const next = !last && zoneById(z.id + 1);
+      this.menu(`<h2>${last ? 'THE CIRCUIT IS YOURS' : 'SECTOR CLEARED'}</h2>
+        <p class="sub">${B.short} falls. ${B.quiet}.${last ? ' Every warden is down: this is the end of <b>Cadence</b>.' : ` The way on to <b>${next.name}</b> is open beyond the arena.`}</p>
+        <div class="wcard"><b>${rw.name}</b> (${rw.cls}) is yours, and <b>${B.echoes}</b> echoes. Equip it at any beacon.</div>
+        <p class="rule">Wardens fallen: ${done} of ${LAST_ZONE}. You died ${s.deaths} time${s.deaths === 1 ? '' : 's'}.${last ? ' Keep exploring, try the other blades, or start again.' : ''}</p>
+        <div class="mlist"><button class="mbtn" data-act="ok">${last ? 'Keep exploring' : 'Go on'}</button><button class="mbtn" data-act="title">Back to the title</button></div>`,
       { ok: () => this.closeMenu(), title: () => this.toTitle() });
     } else {
       s.deaths++;
-      s.shade = s.echoes > 0 ? { x: w.L.bossDoor.x - 70, y: w.L.bossDoor.y1, amount: s.echoes } : null;
+      s.shade = s.echoes > 0 ? { zone: z.id, x: w.L.bossDoor.x - 70, y: w.L.bossDoor.y1, amount: s.echoes } : null;
       s.echoes = 0; this.persist();
       w.cut = null;
-      for (let r = 30; r <= 33; r++) w.L.tiles[r * w.L.cols + w.L.bossDoor.c] = 3;
-      w.spawn(s.beacon);
-      playMusic('explore');
+      w.setDoor(w.L.bossDoor, 3);
+      if (zoneOfBeacon(s.beacon) !== z.id) this.loadZone(zoneOfBeacon(s.beacon), s.beacon);
+      else { w.spawn(s.beacon); playMusic('explore', 0, z.music); }
     }
   },
   toTitle() {
@@ -87,7 +128,7 @@ const game = {
   closeMenu() { this.menus.hide(); muffle(false); if (this.world && this.world.p) this.world.leaveRest(); },
   openBeaconMenu(b) {
     const s = this.save, lvl = levelOf(s.stats), cost = levelCost(lvl);
-    const others = this.world.L.beacons.filter((x) => x.id !== b.id && s.lit.includes(x.id));
+    const others = beaconIndex().filter((x) => x.id !== b.id && s.lit.includes(x.id));
     this.menu(`<h2>${b.name.toUpperCase()}</h2>
       <p class="hint">Rested. Health and flasks restored; the circuit's sentinels have returned.</p>
       <div class="stats"><span>Level <b>${lvl}</b></span><span>Echoes <b>${s.echoes}</b></span><span>Health <b>${maxHP(s.stats)}</b></span><span>Flasks <b>${s.flasksMax}</b></span></div>
@@ -144,9 +185,20 @@ const game = {
     }, () => this.openBeaconMenu(b), keep);
   },
   travelMenu(b) {
-    const s = this.save, others = this.world.L.beacons.filter((x) => x.id !== b.id && s.lit.includes(x.id));
-    this.menus.show(`<h2>TRAVEL</h2><div class="mlist">${others.map((x) => `<button class="mbtn" data-act="go" data-id="${x.id}">${x.name}</button>`).join('')}<button class="mbtn" data-act="back">Back</button></div>`,
-      { go: (el) => { s.beacon = el.dataset.id; this.persist(); this.closeMenu(); this.world.spawn(el.dataset.id); sfx('beacon'); }, back: () => this.openBeaconMenu(b) }, () => this.openBeaconMenu(b));
+    const s = this.save, here = this.world.zone.id, others = beaconIndex().filter((x) => x.id !== b.id && s.lit.includes(x.id));
+    // this zone's beacons first, then the others by zone
+    others.sort((x, y) => (x.zone === here ? -1 : 0) - (y.zone === here ? -1 : 0) || x.zone - y.zone);
+    const row = (x) => `<button class="mbtn" data-act="go" data-id="${x.id}">${x.name}${x.zone !== here ? ` <small>${zoneById(x.zone).name}</small>` : ''}</button>`;
+    this.menus.show(`<h2>TRAVEL</h2><div class="mlist">${others.map(row).join('')}<button class="mbtn" data-act="back">Back</button></div>`,
+      {
+        go: (el) => {
+          const id = el.dataset.id; s.beacon = id; this.persist(); this.closeMenu();
+          if (zoneOfBeacon(id) !== here) { this.loadZone(zoneOfBeacon(id), id); this.world.areaName = { s: this.world.zone.name, t0: 0.2 }; }
+          else this.world.spawn(id);
+          sfx('beacon');
+        },
+        back: () => this.openBeaconMenu(b),
+      }, () => this.openBeaconMenu(b));
   },
   pause(on) {
     if (this.scene === 'title') return;
@@ -213,7 +265,7 @@ function showTitle() {
   document.getElementById('btnContinue').style.display = game.hasSave ? '' : 'none';
   document.getElementById('ver').textContent = 'v' + VERSION;
   game.menus.showTitle(titleActs);
-  if (!game.world) { game.world = new World(game); game.world.spawn(game.save.beacon); }
+  if (!game.world) game.loadZone(zoneOfBeacon(game.save.beacon), game.save.beacon);
 }
 
 /* ---------- resolution ---------- */
@@ -260,6 +312,12 @@ function frame(now) {
     ctx.setTransform(Q, 0, 0, Q, 0, 0);
     if (sc) sc.render(ctx, Q); else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); }
     game.dirty = false;
+  }
+  if (game.fade) {
+    const k = (now - game.fade.t0) / 400;
+    if (!game.fade.in && k >= 1) game.finishZoneChange();
+    else if (game.fade.in && k >= 1) game.fade = null;
+    else { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = `rgba(0,0,0,${game.fade.in ? 1 - k : k})`; ctx.fillRect(0, 0, cv.width, cv.height); }
   }
   wasFrozen = frozen;
   const t2 = performance.now();

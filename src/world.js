@@ -2,8 +2,9 @@
 import { W, H, clamp, rnd, pick, sign } from './util.js';
 import { ATTACKS, ENEMIES, WEAPONS, BASE_WIN, DUR, LEAD, ACT_NAME, maxHP } from './data.js';
 import { Conductor } from './combat.js';
-import { buildLevel, T } from './level.js';
-import { LevelArt, NEON, NEON2, Z, drawVignette } from './render2d.js';
+import { T } from './level.js';
+import { buildZone, zoneById, foeDef } from './zones.js';
+import { LevelArt, NEON, NEON2, Z, drawVignette, themeOf } from './render2d.js';
 import { POSES, lerpPose, copyPose, drawFigure } from './rig.js';
 import { FX, glowSprite } from './fx.js';
 import { input, btn } from './input.js';
@@ -22,9 +23,11 @@ const ENEMY_C = '#e9fbff', ENEMY_RGB = '233,251,255';
 const CLASH_Y = { slash: 40, sweep: 10, slam: 62 };
 
 export class World {
-  constructor(game) {
+  constructor(game, zoneId = 1) {
     this.g = game;
-    this.L = buildLevel();
+    this.zone = zoneById(zoneId);
+    this.L = buildZone(this.zone.id);
+    this.th = themeOf(this.L.theme);
     this.art = new LevelArt(this.L);
     this.fx = new FX(700);
     this.cond = new Conductor();
@@ -38,22 +41,29 @@ export class World {
 
   /* ---------- setup ---------- */
   applySave() {
-    const s = this.g.save;
-    if (s.gateOpen) this.openGateTiles();
-    if (s.bossDead) for (let r = 30; r <= 33; r++) this.L.tiles[r * this.L.cols + this.L.bossDoor.c] = 0;
+    const s = this.g.save, L = this.L;
+    for (const G of L.gates) if (s.gates.includes(G.id)) this.setDoor(G, 0);
+    if (this.bossDead()) { this.setDoor(L.bossDoor, 0); this.setDoor(L.exitDoor, 0); }
   }
-  openGateTiles() { const G = this.L.gate; for (let r = G.r0; r <= G.r1; r++) this.L.tiles[r * this.L.cols + G.c] = 0; }
+  bossDead() { return this.g.save.bosses.includes(this.zone.id); }
+  /** Opens (0) or closes (3) a door or gate. */
+  setDoor(d, v) { if (d) for (let r = d.r0; r <= d.r1; r++) this.L.tiles[r * this.L.cols + d.c] = v; }
+  doorShut(d) { return !!d && this.L.tiles[d.r0 * this.L.cols + d.c] === 3; }
 
-  /** Puts the player at a beacon (or the start), refills, and brings every enemy back. */
-  spawn(beaconId, refill = true) {
-    const s = this.g.save, b = this.L.beacons.find((x) => x.id === beaconId) || this.L.start;
+  /**
+   * Puts the player at a beacon (or the zone's start), refills, and brings every enemy back. `where` is a beacon id
+   * or a spawn point ('entry', 'back': where a passage from the next or last zone comes out).
+   */
+  spawn(where, refill = true) {
+    const s = this.g.save, sp = this.L.spawns[where];
+    const b = sp ? { id: where, x: sp.x - 40 * sp.face, y: sp.y, face: sp.face } : this.L.beacons.find((x) => x.id === where) || this.L.start;
     if (this.tut && b.id !== 'b1') this.tut.end();
     this.cond = new Conductor();
     this.fx.clear();
     this.enemies = this.L.enemies.map((d) => this.makeEnemy(d));
     const wp = WEAPONS[s.equipped];
     this.p = {
-      x: b.x + 40, y: b.y, vx: 0, vy: 0, w: 20, h: 62, onGround: true, face: 1, coyote: 0,
+      x: b.x + 40 * (b.face || 1), y: b.y, vx: 0, vy: 0, w: 20, h: 62, onGround: true, face: b.face || 1, coyote: 0,
       hp: refill ? maxHP(s.stats) : this.p?.hp ?? maxHP(s.stats), poise: 0, pose: copyPose(POSES.idle), weapon: wp,
       move: null, guardUntil: -9, blockKind: 'slash', atk: null, atkReady: 0, lockUntil: 0, stunUntil: 0, hurtUntil: 0,
       heal: null, focusUntil: 0, riposteUntil: 0, dead: false, deadT: 0, lastLand: 0, ghostT: 0, walkPh: 0, rest: false,
@@ -65,12 +75,12 @@ export class World {
     this.art.warm(this.p.x, this.p.y);
   }
   makeEnemy(d) {
-    const def = d.def || ENEMIES[d.type];
+    const def = d.def || foeDef(d.type, this.zone.id);
     return {
       d, def, type: d.type, x: d.x, y: d.y, vx: 0, vy: 0, onGround: true, face: -1, hp: def.hp, poise: 0, lastPoise: -9,
       state: d.ambush ? 'perched' : 'idle', slot: 0, nextPlan: 0, openStart: -9, openEnd: -9, brokenUntil: 0, dead: false,
       pose: copyPose(POSES.idle), recoilT: -9, flinchT: -9, knockUntil: 0, walkPh: rnd(0, 6), deathT: 0, hp0: def.hp,
-      weapon: { len: def.blade, width: def.look === 'hammer' ? 5 : def.look === 'rapier' ? 2 : 3.4, claw: def.look === 'claw', hammer: def.look === 'hammer' },
+      weapon: { len: def.blade, width: def.look === 'hammer' ? 5 : def.look === 'rapier' ? 2 : def.look === 'spear' ? 2.4 : 3.4, claw: def.look === 'claw', hammer: def.look === 'hammer' },
       s: def.h / 100, w: def.w, h: def.h, home: d.x,
     };
   }
@@ -118,6 +128,8 @@ export class World {
     this.cond.prune(t);
     this.checkPickups();
     this.regionBanner();
+    // passages to the next or last zone
+    if (!p.dead && !this.leaving) for (const X of this.L.exits) if (p.x >= X.x0 && p.x < X.x1 && p.y > X.y0 && p.y <= X.y1) { this.leaving = true; this.g.changeZone(X.to, X.spawn); break; }
   }
 
   /* ---------- player ---------- */
@@ -299,7 +311,7 @@ export class World {
     if (e.leaping) {
       this.physics(e, dt, false);
       this.poseTo(e, POSES.jump, 12, dt);
-      if (e.onGround && e.vy === 0 && t > 0.1) { e.leaping = false; e.vx = 0; this.fx.ring(e.x, e.y, NEON2, 60, 0.3, 4); this.shake = Math.max(this.shake, 4); }
+      if (e.onGround && e.vy === 0 && t > 0.1) { e.leaping = false; e.vx = 0; this.fx.ring(e.x, e.y, this.th.neon2, 60, 0.3, 4); this.shake = Math.max(this.shake, 4); }
       return;
     }
     // awareness
@@ -531,8 +543,8 @@ export class World {
       this.hitstop = 0.14; this.shake = 16; this.flash = { c: '220,255,240', a: 0.35 }; sfx('lethal');
       this.showBanner('LETHAL STRIKE', '', '#ffffff', 1.1);
     }
-    this.fx.shards(e.x, e.y - e.h / 2, 46, ENEMY_C, 520, e.h / 2.5); this.fx.motes(e.x, e.y - e.h / 2, 20, NEON2, 160, 120); sfx('shatter');
-    s.echoes += e.def.echoes; this.fx.float('+' + e.def.echoes, e.x, e.y - e.h - 50, NEON, 18);
+    this.fx.shards(e.x, e.y - e.h / 2, 46, ENEMY_C, 520, e.h / 2.5); this.fx.motes(e.x, e.y - e.h / 2, 20, this.th.neon2, 160, 120); sfx('shatter');
+    s.echoes += e.def.echoes; s.kills = (s.kills || 0) + 1; this.fx.float('+' + e.def.echoes, e.x, e.y - e.h - 50, this.th.neon, 18);
     this.g.persist();
   }
 
@@ -540,10 +552,11 @@ export class World {
   interactables() {
     const p = this.p, s = this.g.save, L = this.L, out = [];
     for (const b of L.beacons) if (Math.abs(p.x - b.x) < 60 && Math.abs(p.y - b.y) < 50) out.push({ kind: 'beacon', b, label: s.lit.includes(b.id) ? 'Rest at beacon' : 'Kindle beacon' });
-    const G = L.gate;
-    if (!s.gateOpen && Math.abs(p.x - (G.x + T / 2)) < 70 && p.y > G.y0 && p.y <= G.y1 + 2) out.push({ kind: 'gate', label: p.x > G.x ? 'Open gate' : 'Opens from the other side' });
+    for (const G of L.gates) {
+      if (!s.gates.includes(G.id) && Math.abs(p.x - (G.x + T / 2)) < 70 && p.y > G.y0 && p.y <= G.y1 + 2) out.push({ kind: 'gate', G, label: (p.x > G.x) === (G.openFrom > 0) ? 'Open gate' : 'Opens from the other side' });
+    }
     const D = L.bossDoor;
-    if (!s.bossDead && Math.abs(p.x - D.x) < 70 && p.y > D.y0 && p.y <= D.y1 + 2 && p.x < D.x) out.push({ kind: 'boss', label: 'Enter the arena' });
+    if (D && !this.bossDead() && Math.abs(p.x - D.x) < 70 && p.y > D.y0 && p.y <= D.y1 + 2 && p.x < D.x) out.push({ kind: 'boss', label: 'Enter the arena' });
     return out;
   }
   interact() {
@@ -551,16 +564,17 @@ export class World {
     if (!it || this.attackers().length) return false;
     if (it.kind === 'beacon') { this.rest(it.b); return true; }
     if (it.kind === 'gate') {
-      if (this.p.x < this.L.gate.x) { this.fx.float('It will not open from this side', this.p.x, this.p.y - 90, '#cfe9e0', 14); return true; }
-      s.gateOpen = true; this.openGateTiles(); this.g.persist(); sfx('gate'); this.showBanner('SHORTCUT OPENED', '', NEON, 1.6);
-      this.fx.motes(this.L.gate.x + T / 2, this.p.y - 60, 30, NEON, 140, 40); return true;
+      const G = it.G;
+      if ((this.p.x > G.x) !== (G.openFrom > 0)) { this.fx.float('It will not open from this side', this.p.x, this.p.y - 90, '#cfe9e0', 14); return true; }
+      s.gates.push(G.id); this.setDoor(G, 0); this.g.persist(); sfx('gate'); this.showBanner('SHORTCUT OPENED', '', this.th.neon, 1.6);
+      this.fx.motes(G.x + T / 2, this.p.y - 60, 30, this.th.neon, 140, 40); return true;
     }
     if (it.kind === 'boss') { this.startCut(); return true; }
     return false;
   }
   rest(b) {
     const s = this.g.save, p = this.p;
-    if (!s.lit.includes(b.id)) { s.lit.push(b.id); this.showBanner('BEACON KINDLED', b.name, NEON, 2); sfx('beacon'); this.fx.motes(b.x, b.y - 60, 40, NEON2, 220, 140); }
+    if (!s.lit.includes(b.id)) { s.lit.push(b.id); this.showBanner('BEACON KINDLED', b.name, this.th.neon, 2); sfx('beacon'); this.fx.motes(b.x, b.y - 60, 40, this.th.neon2, 220, 140); }
     else sfx('beacon');
     s.beacon = b.id;
     p.hp = maxHP(s.stats); s.flasks = s.flasksMax; p.poise = 0; p.rest = true;
@@ -579,14 +593,14 @@ export class World {
       if (Math.abs(p.x - it.x) < 30 && Math.abs(p.y - it.y) < 50) {
         s.taken.push(it.id);
         if (it.kind === 'weapon') { s.upgrades[it.weapon] = s.upgrades[it.weapon] || 0; this.showBanner(WEAPONS[it.weapon].name.toUpperCase(), WEAPONS[it.weapon].cls + ' found · equip it at a beacon', '#ffffff', 2.6); }
-        else if (it.kind === 'flask') { s.flasksMax++; s.flasks++; this.showBanner('LUMEN SHARD', 'One more healing flask', NEON2, 2.2); }
-        else { s.echoes += it.amount; this.fx.float('+' + it.amount + ' echoes', it.x, it.y - 60, NEON, 18); }
-        this.fx.motes(it.x, it.y - 20, 24, NEON2, 160, 100); sfx('pickup'); this.g.persist();
+        else if (it.kind === 'flask') { s.flasksMax++; s.flasks++; this.showBanner('LUMEN SHARD', 'One more healing flask', this.th.neon2, 2.2); }
+        else { s.echoes += it.amount; this.fx.float('+' + it.amount + ' echoes', it.x, it.y - 60, this.th.neon, 18); }
+        this.fx.motes(it.x, it.y - 20, 24, this.th.neon2, 160, 100); sfx('pickup'); this.g.persist();
       }
     }
-    const sh = s.shade;
+    const sh = s.shade && s.shade.zone === this.zone.id ? s.shade : null;
     if (sh && Math.abs(p.x - sh.x) < 34 && Math.abs(p.y - sh.y) < 60 && !p.dead) {
-      s.echoes += sh.amount; this.fx.float('+' + sh.amount + ' echoes recovered', sh.x, sh.y - 70, NEON, 18);
+      s.echoes += sh.amount; this.fx.float('+' + sh.amount + ' echoes recovered', sh.x, sh.y - 70, this.th.neon, 18);
       this.fx.motes(sh.x, sh.y - 30, 30, PLAYER_C, 200, 80); s.shade = null; sfx('pickup'); this.g.persist();
     }
   }
@@ -602,7 +616,7 @@ export class World {
   startCut() {
     const p = this.p;
     p.atk = null; p.heal = null; p.vx = 0;
-    for (let r = 30; r <= 33; r++) this.L.tiles[r * this.L.cols + this.L.bossDoor.c] = 0;
+    this.setDoor(this.L.bossDoor, 0);
     this.cut = { t0: this.t, phase: 0 };
     sfx('gate');
   }
@@ -703,17 +717,17 @@ export class World {
   onScreen(x, y) { return x > this.cam.x - 200 && x < this.cam.x + VW + 200 && y > this.cam.y - 100 && y < this.cam.y + VH + 200; }
 
   drawProps(ctx) {
-    const s = this.g.save, L = this.L, t = performance.now() / 1000;
+    const s = this.g.save, L = this.L, t = performance.now() / 1000, th = this.th;
     // beacons: a pillar of light, brighter once kindled
     for (const b of L.beacons) {
       if (!this.onScreen(b.x, b.y)) continue;
       const lit = s.lit.includes(b.id), a = lit ? 1 : 0.35, pulse = 0.8 + 0.2 * Math.sin(t * 2.4);
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = 0.18 * a * pulse; ctx.fillStyle = NEON2; ctx.fillRect(b.x - 18, b.y - 220, 36, 220);
+      ctx.globalAlpha = 0.18 * a * pulse; ctx.fillStyle = th.neon2; ctx.fillRect(b.x - 18, b.y - 220, 36, 220);
       ctx.globalAlpha = 0.5 * a; ctx.fillRect(b.x - 3, b.y - 220, 6, 220);
-      ctx.globalAlpha = a * pulse; const gs = glowSprite(NEON2); ctx.drawImage(gs, b.x - 40, b.y - 110, 80, 80);
+      ctx.globalAlpha = a * pulse; const gs = glowSprite(th.neon2); ctx.drawImage(gs, b.x - 40, b.y - 110, 80, 80);
       ctx.restore();
-      ctx.strokeStyle = NEON2; ctx.lineWidth = 2; ctx.fillStyle = '#021710';
+      ctx.strokeStyle = th.neon2; ctx.lineWidth = 2; ctx.fillStyle = th.plat;
       ctx.beginPath(); ctx.moveTo(b.x - 22, b.y); ctx.lineTo(b.x - 12, b.y - 36); ctx.lineTo(b.x + 12, b.y - 36); ctx.lineTo(b.x + 22, b.y); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(b.x, b.y - 72 - 10 * pulse); ctx.lineTo(b.x + 12, b.y - 58); ctx.lineTo(b.x, b.y - 44); ctx.lineTo(b.x - 12, b.y - 58); ctx.closePath(); ctx.stroke();
     }
@@ -722,23 +736,22 @@ export class World {
       if (s.taken.includes(it.id) || !this.onScreen(it.x, it.y)) continue;
       const by = it.y - 26 + Math.sin(t * 2 + it.x) * 5;
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.7;
-      ctx.drawImage(glowSprite(it.kind === 'weapon' ? '#ffffff' : NEON2), it.x - 26, by - 26, 52, 52); ctx.restore();
+      ctx.drawImage(glowSprite(it.kind === 'weapon' ? '#ffffff' : th.neon2), it.x - 26, by - 26, 52, 52); ctx.restore();
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
       if (it.kind === 'weapon') { ctx.beginPath(); ctx.moveTo(it.x - 12, by + 12); ctx.lineTo(it.x + 12, by - 12); ctx.moveTo(it.x - 12, by + 4); ctx.lineTo(it.x - 4, by + 12); ctx.stroke(); }
       else { ctx.beginPath(); ctx.moveTo(it.x, by - 9); ctx.lineTo(it.x + 7, by); ctx.lineTo(it.x, by + 9); ctx.lineTo(it.x - 7, by); ctx.closePath(); ctx.stroke(); }
     }
-    // the shortcut gate and the arena door
-    const G = L.gate;
-    if (!s.gateOpen && this.onScreen(G.x, G.y0)) this.drawBars(ctx, G.x, G.y0, G.y1, NEON2);
-    const D = L.bossDoor;
-    if (L.tiles[30 * L.cols + D.c] === 3 && this.onScreen(D.x, D.y0)) this.drawBars(ctx, D.x, D.y0, D.y1, '#ffffff', true);
+    // shortcut gates, the arena door and the way on past the arena
+    for (const G of L.gates) if (!s.gates.includes(G.id) && this.onScreen(G.x, G.y0)) this.drawBars(ctx, G.x, G.y0, G.y1, th.neon2);
+    for (const D of [L.bossDoor, L.exitDoor]) if (this.doorShut(D) && this.onScreen(D.x, D.y0)) this.drawBars(ctx, D.x, D.y0, D.y1, '#ffffff', true);
     // the boss waiting in the arena during the walk in
-    if (!this.hideFigs && (this.cut || (!s.bossDead && this.onScreen(L.arena.bossX, L.arena.floor)))) {
-      const fig = { pose: POSES.idle, x: L.arena.bossX, y: L.arena.floor, s: 0.86, face: -1, color: '#ffffff', rgb: '255,255,255', weapon: { len: 52, width: 3, claw: true }, body: 6, alpha: this.cut ? 1 : 0.5 };
+    if (!this.hideFigs && (this.cut || (!this.bossDead() && this.onScreen(L.arena.bossX, L.arena.floor)))) {
+      const lk = this.zone.boss.look, weapon = lk.twin ? { len: 52, width: 3, claw: true } : { len: lk.sword * 0.42, width: Math.max(2.4, lk.bladeW * 0.6) };
+      const fig = { pose: POSES.idle, x: L.arena.bossX, y: L.arena.floor, s: 0.86, face: -1, color: lk.color, rgb: lk.rgb, weapon, body: 6, alpha: this.cut ? 1 : 0.5 };
       drawFigure(ctx, fig);
     }
     // your lost echoes
-    if (s.shade && this.onScreen(s.shade.x, s.shade.y)) {
+    if (s.shade && s.shade.zone === this.zone.id && this.onScreen(s.shade.x, s.shade.y)) {
       const sh = s.shade, k = Math.sin(t * 3) * 6;
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.8;
       ctx.drawImage(glowSprite(PLAYER_C), sh.x - 30, sh.y - 70 + k, 60, 60);

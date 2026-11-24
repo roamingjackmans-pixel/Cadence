@@ -1,7 +1,8 @@
 // Plays the built game headlessly and fails on any error. Serves <dir> itself (default: the repo).
 //   node tools/smoke.mjs [dir]
 // Boots to the title, starts a new game, fights in the galleries and on the Spans with autoplay (which answers
-// through the same press() path as the keys), walks into the arena and wins the duel, then checks the save.
+// through the same press() path as the keys), walks into the arena and wins the duel, walks on through the far door
+// into the second zone, then checks the save, and that a save from before the zones still loads.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -50,23 +51,38 @@ try {
   step('spans: two attackers, player hp ' + Math.round(await page.evaluate(() => window.__cadence.world.p.hp)));
 
   // the arena: walk in, then the duel
-  await page.evaluate(() => { const g = window.__cadence; g.autoplay = true; const w = g.world; w.spawn('b3'); w.p.x = 213 * 32; w.p.y = 34 * 32; });
+  await page.evaluate(() => { const g = window.__cadence; g.autoplay = true; const w = g.world; w.spawn('b3'); const D = w.L.bossDoor; w.p.x = D.x - 40; w.p.y = D.y1; });
   await page.waitForTimeout(300);
   await page.keyboard.press('KeyE');
   await page.waitForFunction(() => window.__cadence.scene === 'boss', null, { timeout: 10000 });
   step('walked into the arena');
-  await page.waitForFunction(() => { const b = window.__cadence.boss; if (b && b.mode === 'play') b.bossPost = Math.max(b.bossPost, 99); return window.__cadence.save.bossDead; }, null, { timeout: 60000, polling: 200 });
+  await page.waitForFunction(() => { const b = window.__cadence.boss; if (b && b.mode === 'play') b.bossPost = Math.max(b.bossPost, 99); return window.__cadence.save.bosses.includes(1); }, null, { timeout: 60000, polling: 200 });
   await page.waitForFunction(() => window.__cadence.scene === 'world' && document.getElementById('menuPanel').innerText.includes('SECTOR CLEARED'), null, { timeout: 10000 });
   const s = await page.evaluate(() => window.__cadence.save);
   ok(s.upgrades.crescent === 0, 'no Crescent after the boss');
   step('duel won, Crescent taken, ' + s.echoes + ' echoes');
 
+  // on through the far door into the Sunken Relay
+  await page.evaluate(() => { const g = window.__cadence; g.closeMenu(); g.autoplay = false; const w = g.world; w.p.x = w.L.exits[0].x0 - 50; w.p.y = w.L.arena.floor; });
+  await page.keyboard.down('KeyD'); await page.waitForTimeout(700); await page.keyboard.up('KeyD');
+  await page.waitForFunction(() => window.__cadence.world.zone.id === 2 && !window.__cadence.fade, null, { timeout: 10000 });
+  ok(await page.evaluate(() => window.__cadence.save.zone === 2), 'zone not saved');
+  step('walked on into ' + (await page.evaluate(() => window.__cadence.world.zone.name)));
+
   // the save survives a reload
   await page.reload();
   await page.waitForFunction(() => window.__cadence);
   ok(await page.isVisible('#btnContinue'), 'no Continue after reload');
-  ok(await page.evaluate(() => window.__cadence.save.bossDead), 'save lost on reload');
+  ok(await page.evaluate(() => window.__cadence.save.bosses.includes(1)), 'save lost on reload');
   step('save kept');
+
+  // a save from before the twelve zones
+  await page.evaluate(() => localStorage.setItem('cadence-save-v1', JSON.stringify({ v: 1, stats: { vit: 10, guard: 8, str: 9, fin: 8, focus: 8 }, echoes: 50, upgrades: { arming: 1, crescent: 0 }, equipped: 'arming', flasks: 2, flasksMax: 4, lit: ['b1', 'b2', 'b3'], beacon: 'b2', taken: ['shard1'], gateOpen: true, bossDead: true, shade: { x: 6900, y: 1088, amount: 300 }, hints: true, deaths: 3, kills: 9 })));
+  await page.reload();
+  await page.waitForFunction(() => window.__cadence && window.__cadence.world);
+  const m = await page.evaluate(() => { const s = window.__cadence.save; return { v: s.v, gates: s.gates, bosses: s.bosses, shade: s.shade, zone: window.__cadence.world.zone.id }; });
+  ok(m.v === 2 && m.gates[0] === 'gate1' && m.bosses[0] === 1 && m.shade === null && m.zone === 1, 'old save not carried over: ' + JSON.stringify(m));
+  step('a save from before the zones carries over');
   ok(!errors.length, 'page errors:\n' + errors.join('\n'));
   console.log('smoke: ok');
 } catch (e) {

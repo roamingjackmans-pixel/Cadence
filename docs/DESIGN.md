@@ -67,23 +67,59 @@ Swords **(owner)**: each class has block windows per strike and evade windows pe
 | Nightedge | Katana | perfect deflects (wide window), riposte | sweeps and slams a little |
 | Crescent | Sabre (boss reward) | blocking slashes, jumping | blocking sweeps |
 
-Each can be reforged to +3 with echoes.
+Each warden after the first drops a sword of its own (Undertow, Glasspin, Anvilheart, Rimefangs, Cobalt Verdict,
+Ashen Thread, Saint's Mercy, Thornbrand, Sovereign Pair, Hollow Crown, The First Measure). Each sword can be reforged
+to +5 with echoes.
 
-## The first area
+## The zones
 
-The Verdant Circuit: Boot Chamber, Sentinel Walk (a shortcut gate that opens from the far side), Lower Galleries,
-the Monolith vault, Junction, the Spans (an ambush from behind), the Undercroft, the Antechamber. Enemies: Grid
-Sentinel, Shardling, Mirror Duelist, Hammerframe. Built from rectangles in `src/level.js`.
+Twelve zones, each ending in a warden, each warden harder than the last **(owner)**. They run in a line: beat a
+warden and a second door at the far side of its arena opens onto a passage into the next zone; the passage at a zone's
+start leads back. Beacons in every zone you have lit are on the travel list. Each zone has its own neon (greens,
+teals, blues and whites: never red, yellow or purple), its own skyline, its own key and tempo for the music, and its
+own enemies, which hit harder and come a little faster zone by zone (`foeDef` in `src/zones.js`).
 
-## The boss
+| | Zone | Warden |
+| :- | :- | :- |
+| 1 | The Verdant Circuit | The Twin Dancer |
+| 2 | The Sunken Relay | The Drowned Herald |
+| 3 | The Glasswork Spires | The Glass Duchess |
+| 4 | The Hollow Foundry | The Forge Colossus |
+| 5 | The Frostline Array | The Frost Regent |
+| 6 | The Cobalt Depths | The Cobalt Executioner |
+| 7 | The Ashen Lattice | The Ashen Weaver |
+| 8 | The Tidewater Cloister | The Cloister Saint |
+| 9 | The Overgrowth | The Thorned Knight |
+| 10 | The Azure Reach | The Azure Sovereign |
+| 11 | The Null Expanse | The Hollow King |
+| 12 | The Heart of the Circuit | The Conductor |
 
-The Twin Dancer **(owner)**. At the arena door you walk in and stop, and the camera takes over with no cut or fade
-**(owner)**: the opening shot starts on the very frame you were looking at, then the play area turns away like a stage
-flat while the neon arena comes up around you both. Over about six seconds the camera turns slowly from side-on,
-keeping you in frame, until it is behind you with her ahead, and lands on the 1v1 view as in the prototype (A, X or E
-skips it). Incoming strikes fly in from behind her as coloured blades showing their path. Three phases,
-each faster; a lethal strike ends each. No music chart: her timing is her own **(owner)**. A/D (or LT with the stick)
-step left and right.
+The Verdant Circuit is the largest **(owner: much larger)**: the first part as drawn by hand (Boot Chamber, Sentinel
+Walk with its shortcut gate, Lower Galleries, the Monolith vault, Junction, the Spans and the Undercroft), then the
+Overpass, Signal Gardens, the Deep Relay, Relay Depths and the Lantern Stair before the Antechamber. The other zones are
+lists of named areas in `src/zones.js`, each built from segments in `src/level.js` (corridors, stairs, pits, climbs,
+drops, a vault above the corridor, a passage under it, an ambush ledge). The segments keep the movement rules: ledges
+3 rows apart, 1-tile steps, 3-wide pits, no enemy within 8 tiles of a pit (near an enemy every jump is a hop).
+`tools/check-levels.mjs` (part of `npm test`) walks every zone and fails if any beacon, item, arena or passage can't
+be reached from the zone's first beacon, or can't be left again.
+
+Enemies: Grid Sentinel, Shardling, Mirror Duelist, Hammerframe, and beyond the first zone the Spire Lancer (long
+reach, slams), Flicker (fast pairs), Bastion Warden (heavy) and Echo Blademaster (long phrases).
+
+## The wardens
+
+At the arena door you walk in and stop, and the camera takes over with no cut or fade **(owner)**: the opening shot
+starts on the very frame you were looking at, then the play area turns away like a stage flat while the neon arena
+comes up around you both. Over about six seconds the camera turns slowly from side-on, keeping you in frame, until it
+is behind you with the warden ahead, and lands on the 1v1 view as in the prototype (A, X or E skips it). Incoming
+strikes fly in from behind the warden as coloured blades showing their path. A lethal strike ends each phase. No music
+chart: each warden's timing is its own **(owner)**. A/D (or LT with the stick) step left and right.
+
+The Twin Dancer (first written by hand) has three phases. Each later warden gets more health and poise, hits harder,
+and has faster beats, longer phrases with more fast follow-ups, shorter openings and less warning before each strike
+(`bossDef` in `src/zones.js`); wardens 8 to 11 have four phases and the Conductor five. Each favours some strikes
+(the Herald slams, the Duchess slashes, the Regent sweeps). Their phrases are made from a seed, and every one is
+checked to be answerable on its own.
 
 ## Controls
 

@@ -14,7 +14,8 @@ Your guard can't take two strikes closer than a quarter second, so fast pairs ma
 jump or a step (jump the first sweep, block the second on the way down). Answers fill the enemy's poise; fill it and
 finish it with a lethal strike. Back away and its poise drains.
 
-The first area, the Verdant Circuit, ends in a third-person duel with the Twin Dancer.
+Twelve zones, from the Verdant Circuit to the Heart of the Circuit, each end in a third-person duel with a warden,
+each harder than the last. Beat one and the way on to the next zone opens beyond its arena.
 
 ## Controls
 
@@ -48,7 +49,7 @@ then open http://localhost:8765. Run `npm install` once for the tools (Playwrigh
 ## Deploying
 
 Push to `main`. [.github/workflows/ready.yml](.github/workflows/ready.yml) runs `npm test` (the conductor fuzz
-test), builds `_site/` with `tools/stamp.mjs` (a version stamp and `?v=<commit>` on every URL, so browsers never mix a
+test and `tools/check-levels.mjs`, which walks every zone and fails if anything can't be reached), builds `_site/` with `tools/stamp.mjs` (a version stamp and `?v=<commit>` on every URL, so browsers never mix a
 cached file with a new one), plays that build headlessly with `tools/smoke.mjs`, and only then moves the `ready`
 branch to that commit. The games site ([roamingjackmans-pixel/games](https://github.com/roamingjackmans-pixel/games))
 picks up new `ready` commits within 10 minutes, builds them with `tools/stamp-build.mjs` and publishes them at

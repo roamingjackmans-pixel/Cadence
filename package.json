@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "serve": "py -m http.server 8765 --bind 127.0.0.1",
-    "test": "node tools/test-conductor.mjs",
+    "test": "node tools/test-conductor.mjs && node tools/check-levels.mjs",
     "smoke": "node tools/smoke.mjs",
     "stamp": "node tools/stamp.mjs _site"
   },

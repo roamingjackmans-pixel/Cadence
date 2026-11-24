@@ -85,16 +85,19 @@ const TRACKS = {
   victory: { bpm: 84, prog: [[48, 52, 55], [45, 48, 52], [41, 45, 48], [43, 47, 50]], drums: 'none', arp: 'sine', bassVol: 0.08 },
 };
 let mus = null;   // { track, step, t0, intensity }
-export function playMusic(name, intensity = 0) {
+/** v: a zone's variation, { shift: semitones, bpm: added tempo }, so every zone has its own key and pace. */
+export function playMusic(name, intensity = 0, v = null) {
   if (!AC) return;
-  if (mus && mus.name === name) { mus.intensity = intensity; return; }
-  mus = { name, tr: TRACKS[name], step: 0, next: AC.currentTime + 0.1, intensity };
+  const key = name + (v ? ':' + (v.shift || 0) + ':' + (v.bpm || 0) : '');
+  if (mus && mus.key === key) { mus.intensity = intensity; return; }
+  const base = TRACKS[name], tr = v ? { ...base, bpm: base.bpm + (v.bpm || 0), prog: base.prog.map((ch) => ch.map((m) => m + (v.shift || 0))) } : base;
+  mus = { name, key, tr, step: 0, next: AC.currentTime + 0.1, intensity };
 }
 export function setIntensity(v) { if (mus) mus.intensity = v; }
 export function stopMusic() { mus = null; }
 
 function musicStep(k, T) {
-  const tr = mus.tr, sd = 60 / (tr.bpm + mus.intensity * 10) / 4, i = k % 16, bar = Math.floor(k / 16), ch = tr.prog[bar % tr.prog.length], I = mus.intensity;
+  const tr = mus.tr, sd = 60 / (tr.bpm + Math.min(3, mus.intensity) * 10) / 4, i = k % 16, bar = Math.floor(k / 16), ch = tr.prog[bar % tr.prog.length], I = mus.intensity;
   if (tr.drums === 'soft') {
     if (i === 0 || i === 8) osc('sine', 120, T, 0.3, 0.32, MUS, 45);
     if (i % 4 === 2) nz(T, 0.03, 0.05, 'highpass', 8000, MUS);

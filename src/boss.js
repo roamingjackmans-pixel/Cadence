@@ -1,12 +1,12 @@
 // The duel with the Twin Dancer, seen from behind you: the prototype's view, restyled and without the music chart.
 import { W, H, clamp, rnd, pick, smooth, wrapA, makeCanvas, bitmapify } from './util.js';
-import { ATTACKS, WEAPONS, BOSS, BASE_WIN, JUMP_AIR, ACT_NAME, maxHP } from './data.js';
+import { ATTACKS, WEAPONS, BASE_WIN, JUMP_AIR, ACT_NAME, maxHP } from './data.js';
 import { Conductor } from './combat.js';
 import { FX, glowSprite } from './fx.js';
 import { input, btn } from './input.js';
 import { sfx, setIntensity } from './audio.js';
 import { txt as txtC, bar } from './hud.js';
-import { makeVignette, drawVignette } from './render2d.js';
+import { makeVignette, drawVignette, themeOf } from './render2d.js';
 
 let CTX = null;
 const txt = (s, x, y, size, c, align, weight) => txtC(CTX, s, x, y, size, c, align, weight);
@@ -15,8 +15,7 @@ const HORIZON = 300, VPX = 640;
 const PX = 560, PY = 700, PS = 1.42;
 const BXc = 720, BY = 452, BS = 1.12;
 const DUR = { block: 0.26, duck: 0.34, jump: JUMP_AIR, side: 0.36 };
-const LEADS = [1.6, 1.25, 1.0];
-const PLAYER_C = '#5ff3ff', PLAYER_RGB = '95,243,255', BOSS_C = '#f2fbff', BOSS_RGB = '242,251,255';
+const PLAYER_C = '#5ff3ff', PLAYER_RGB = '95,243,255';
 const CP = { slash: { x: PX - 10, y: PY - 300 }, sweep: { x: PX - 40, y: PY - 20 }, slam: { x: PX + 10, y: PY - 330 } };
 
 /* skeletons in screen units (~190 tall, feet at 0) */
@@ -113,14 +112,15 @@ function drawRig(ctx, o) {
 }
 
 export class BossFight {
-  constructor(game, hp, snap) {
-    this.g = game;
+  /** zone: the zone whose warden this is (its boss table and its colours). */
+  constructor(game, hp, snap, zone) {
+    this.g = game; this.zone = zone; this.B = zone.boss; this.th = themeOf(zone.theme);
     const s = game.save;
     this.w = WEAPONS[s.equipped];
     this.cond = new Conductor();
     this.fx = new FX(700);
     this.t = 0; this.mode = 'intro'; this.phase = 0; this.hitstop = 0; this.shake = 0; this.flash = null; this.zoom = null;
-    this.bossHP = BOSS.hp; this.bossShow = BOSS.hp; this.bossPost = 0; this.lastPost = -9; this.nextPlan = 0; this.openings = []; this.knock = null;
+    this.bossHP = this.B.hp; this.bossShow = this.B.hp; this.bossPost = 0; this.lastPost = -9; this.nextPlan = 0; this.openings = []; this.knock = null;
     this.brokenAt = 0; this.alt = 1;
     this.pHP = hp; this.pShow = hp; this.pPost = 0;
     this.player = { move: null, guardUntil: -9, blockKind: 'slash', atk: null, atkReady: 0, lockUntil: 0, stunUntil: 0, hurtUntil: 0, heal: null, focusUntil: 0, riposteUntil: 0, pose: { ...PP.idle }, x: 0, y: 0, s: 1, sideDir: 1, ghosts: [] };
@@ -217,7 +217,7 @@ export class BossFight {
         this.gradeText('BLOCK', '#d8fff4'); this.pPost += 13 * w.guardCost * (1 - 0.04 * (s.stats.guard - 8)); this.gain(2.5); sfx('block');
       } else { this.gradeText(ACT_NAME[n.action], '#bfe9e0'); this.gain(3.25); }
     } else {
-      this.hurt(n.type === 'slam' ? BOSS.slamDmg : BOSS.dmg, n.type);
+      this.hurt(n.type === 'slam' ? this.B.slamDmg : this.B.dmg, n.type);
     }
     const sg = n.seg; sg.done++; if (n.result === 'perfect') sg.perfect++;
     if (sg.done === sg.n && sg.perfect === sg.n && sg.n >= 2 && this.mode === 'play') this.knockback(sg);
@@ -247,10 +247,10 @@ export class BossFight {
   checkPosture() {
     if (this.mode !== 'play') return;
     if (this.pPost >= 100) { this.pPost = 50; this.player.stunUntil = this.t + 0.9; this.showBanner('GUARD BROKEN', 'You are open', '#ffffff', 1.2); sfx('brk'); }
-    if (this.bossPost >= BOSS.poise || this.bossHP <= 0) this.breakBoss();
+    if (this.bossPost >= this.B.poise || this.bossHP <= 0) this.breakBoss();
   }
   breakBoss() {
-    this.bossPost = BOSS.poise; this.mode = 'broken'; this.brokenAt = this.t;
+    this.bossPost = this.B.poise; this.mode = 'broken'; this.brokenAt = this.t;
     this.cond.cancelOwner(this, this.t, true); this.openings = [];
     const b = this.bossPos(); this.fx.sparks(b.x, b.y - 150 * b.s, 34, '#ffffff', 750);
     this.showBanner('POISE BROKEN', btn('attack') + '  Lethal strike', '#ffffff', 1.6); sfx('brk');
@@ -286,25 +286,25 @@ export class BossFight {
   }
   lethal() {
     const t = this.t, b = this.bossPos(), hx = b.x, hy = b.y - 130 * b.s;
-    this.fx.sparks(hx, hy, 80, '#ffffff', 1200); this.fx.shards(hx, hy, 30, BOSS_C, 600, 40);
+    this.fx.sparks(hx, hy, 80, '#ffffff', 1200); this.fx.shards(hx, hy, 30, this.B.look.color, 600, 40);
     this.fx.cut(hx, hy, -0.6, 480, '#ffffff', 0.4, 12); this.fx.ring(hx, hy, '#ffffff', 260, 0.5, 8); this.fx.flare(hx, hy, '#ffffff', 900, 0.4);
     this.flash = { c: '230,255,250', a: 0.55 }; this.shake = 22; this.hitstop = 0.16; this.boss.flinchUntil = t + 0.5;
     sfx('lethal');
     this.phase++;
-    if (this.phase >= BOSS.phases.length) { this.bossHP = 0; this.end('win'); return; }
-    this.showBanner('LETHAL STRIKE', this.phase === 1 ? 'She draws her second wind' : 'The last dance', '#ffffff', 1.8);
-    this.mode = 'play'; this.bossHP = BOSS.hp; this.bossPost = 0; this.nextPlan = t + 1.4;
+    if (this.phase >= this.B.phases.length) { this.bossHP = 0; this.end('win'); return; }
+    this.showBanner('LETHAL STRIKE', this.B.lines[this.phase - 1] || '', '#ffffff', 1.8);
+    this.mode = 'play'; this.bossHP = this.B.hp; this.bossPost = 0; this.nextPlan = t + 1.4;
     this.pHP = Math.min(maxHP(this.g.save.stats), this.pHP + 10);
     setIntensity(this.phase);
   }
   end(result) {
     this.mode = 'over'; this.result = result; this.endAt = this.t + (result === 'win' ? 3 : 2.4);
     this.cond.cancelOwner(this, this.t, true);
-    if (result === 'win') { this.showBanner('THE TWIN DANCER FALLS', 'The Verdant Circuit is quiet', '#ffffff', 3); sfx('shatter'); }
+    if (result === 'win') { this.showBanner(this.B.name + ' FALLS', this.B.quiet, '#ffffff', 3); sfx('shatter'); }
     else { this.showBanner('YOU FELL', 'The dance goes on without you', '#ffffff', 2.4); sfx('death'); }
   }
 
-  noteExtra() { return { lead: LEADS[this.phase] }; }
+  noteExtra() { return { lead: this.B.leads[this.phase] }; }
   /** Slashes and sweeps come from one side or the other; slams alternate a slight angle so back-to-back ones stay apart. */
   sideNotes() {
     for (const n of this.cond.notes) if (n.lane === undefined) {
@@ -313,8 +313,8 @@ export class BossFight {
     }
   }
   plan() {
-    const t = this.t, ph = BOSS.phases[this.phase];
-    const notes = this.cond.plan(this, pick(ph.phrases), ph.beat, t + LEADS[this.phase], t, {
+    const t = this.t, ph = this.B.phases[this.phase];
+    const notes = this.cond.plan(this, pick(ph.phrases), ph.beat, t + this.B.leads[this.phase], t, {
       maxShift: 0.6, extra: this.noteExtra(),
       chamber: (type, gap) => (type === 'slam' ? Math.min(0.7, Math.max(0.24, gap * 0.85)) : Math.min(0.55, Math.max(0.16, gap * 0.8))),
     });
@@ -323,7 +323,7 @@ export class BossFight {
     const last = notes[notes.length - 1].time;
     const op = { start: last + 0.16, end: last + 0.16 + ph.open, seg: notes[0].seg };
     this.openings.push(op);
-    this.nextPlan = op.end + rnd(ph.rest[0], ph.rest[1]) - LEADS[this.phase] * 0.6;
+    this.nextPlan = op.end + rnd(ph.rest[0], ph.rest[1]) - this.B.leads[this.phase] * 0.6;
   }
 
   /* ---------- update ---------- */
@@ -334,7 +334,7 @@ export class BossFight {
     const t = this.t, p = this.player, adt = this.hitstop > 0 ? 0 : dt;
     this.hitstop = Math.max(0, this.hitstop - dt);
     if (this.mode === 'intro') {
-      if (t > 1.8 && !this.introBanner) { this.introBanner = true; this.showBanner(BOSS.name, BOSS.sub, '#ffffff', 2.8); }
+      if (t > 1.8 && !this.introBanner) { this.introBanner = true; this.showBanner(this.B.name, this.B.sub, '#ffffff', 2.8); }
       if (t >= INTRO || this.skipIntro) { this.mode = 'play'; this.nextPlan = t + 0.6; }
     }
     if (this.mode === 'play') {
@@ -352,7 +352,7 @@ export class BossFight {
       }
       if (t - this.lastPost > 1.6) this.bossPost = Math.max(0, this.bossPost - 4 * dt);
     }
-    if (this.mode === 'broken' && t - this.brokenAt > 3) { this.mode = 'play'; this.bossPost = BOSS.poise * 0.6; if (this.bossHP <= 0) this.bossHP = BOSS.hp * 0.15; this.nextPlan = t + 0.4; this.showBanner('RECOVERED', 'Too slow', '#cfe9e0', 1); }
+    if (this.mode === 'broken' && t - this.brokenAt > 3) { this.mode = 'play'; this.bossPost = this.B.poise * 0.6; if (this.bossHP <= 0) this.bossHP = this.B.hp * 0.15; this.nextPlan = t + 0.4; this.showBanner('RECOVERED', 'Too slow', '#cfe9e0', 1); }
     if (this.mode === 'over' && t >= this.endAt && !this.reported) { this.reported = true; this.g.onBossEnd(this.result, this.pHP); }
     this.cond.prune(t);
     this.openings = this.openings.filter((o) => t < o.end + 1);
@@ -472,6 +472,8 @@ export class BossFight {
     }
     return bt;
   }
+  /** How the boss's figure is drawn: colour, head, blade length and width, one blade or two. */
+  rigLook() { const k = this.B.look; return { color: k.color, rgb: k.rgb, headR: k.headR, sword: k.sword, bladeW: k.bladeW, twin: !!k.twin }; }
   bossPos() { return { x: BXc + this.boss.x, y: BY + this.boss.y, s: BS * this.boss.s }; }
   zoomPunch(amt, x, y) { if (!this.zoom || amt >= this.zoom.amt * Math.exp(-(this.t - this.zoom.t0) * 9)) this.zoom = { amt, x, y, t0: this.t }; }
   showBanner(s, sub, c, dur = 1.4) { this.banner = { s, sub, c, t0: performance.now() / 1000, dur }; }
@@ -522,6 +524,7 @@ export class BossFight {
     ctx.restore();
   }
   renderIntro(ctx, Q) {
+    const th = this.th;
     CTX = ctx;
     if (this.q !== Q) { this.q = Q; this.makeBG(); }
     ctx.setTransform(Q, 0, 0, Q, 0, 0);
@@ -534,9 +537,9 @@ export class BossFight {
     ctx.globalAlpha = aA;
     // sky and floor (the horizon stays put: the camera only turns, never tilts)
     let gr = ctx.createLinearGradient(0, 0, 0, HORIZON);
-    gr.addColorStop(0, '#000201'); gr.addColorStop(0.7, '#021209'); gr.addColorStop(1, '#063a22');
+    gr.addColorStop(0, th.sky[0]); gr.addColorStop(0.7, th.sky[1]); gr.addColorStop(1, th.horizon);
     ctx.fillStyle = gr; ctx.fillRect(0, 0, W, HORIZON);
-    gr = ctx.createLinearGradient(0, HORIZON, 0, H); gr.addColorStop(0, '#021a0e'); gr.addColorStop(1, '#000503');
+    gr = ctx.createLinearGradient(0, HORIZON, 0, H); gr.addColorStop(0, th.floorTop); gr.addColorStop(1, th.floorBot);
     ctx.fillStyle = gr; ctx.fillRect(0, HORIZON, W, H - HORIZON);
     // the ring of pylons, far to near, standing on the horizon like the duel's backdrop
     const py = [];
@@ -549,15 +552,15 @@ export class BossFight {
     for (const q of py) {
       const s = q.b.s, x = q.b.x, top = q.b.y - q.h * s, hw = q.w * s / 2;
       if (x + hw < -40 || x - hw > W + 40) continue;
-      ctx.fillStyle = '#010b06'; ctx.fillRect(x - hw, top, hw * 2, q.h * s);
-      ctx.strokeStyle = 'rgba(61,255,154,.35)'; ctx.lineWidth = 1.5; ctx.strokeRect(x - hw, top, hw * 2, q.h * s);
-      ctx.fillStyle = 'rgba(25,224,176,.6)'; ctx.fillRect(x - 1, top - 125 * s, 2, 125 * s);
+      ctx.fillStyle = th.body; ctx.fillRect(x - hw, top, hw * 2, q.h * s);
+      ctx.strokeStyle = th.a(0.35); ctx.lineWidth = 1.5; ctx.strokeRect(x - hw, top, hw * 2, q.h * s);
+      ctx.fillStyle = th.b(0.6); ctx.fillRect(x - 1, top - 125 * s, 2, 125 * s);
     }
     const hz = ctx.createLinearGradient(0, HORIZON - 40, 0, HORIZON + 10);
-    hz.addColorStop(0, 'rgba(61,255,154,0)'); hz.addColorStop(1, 'rgba(61,255,154,.35)');
+    hz.addColorStop(0, th.a(0)); hz.addColorStop(1, th.a(0.35));
     ctx.fillStyle = hz; ctx.fillRect(0, HORIZON - 40, W, 50);
     // the floor grid, clipped at the lens
-    ctx.strokeStyle = 'rgba(61,255,154,.3)'; ctx.lineWidth = 1.2; ctx.beginPath();
+    ctx.strokeStyle = th.a(0.3); ctx.lineWidth = 1.2; ctx.beginPath();
     const G = 101, N = 46, cx = 0, cz = IC.mid.z;
     for (let i = -N; i <= N; i++) {
       seg3(ctx, cam, cx + i * G, cz - N * G, cx + i * G, cz + N * G);
@@ -566,7 +569,7 @@ export class BossFight {
     ctx.stroke();
     // distance haze over the grid's far lines
     gr = ctx.createLinearGradient(0, HORIZON, 0, HORIZON + 80);
-    gr.addColorStop(0, 'rgba(2,26,14,.85)'); gr.addColorStop(1, 'rgba(2,26,14,0)');
+    gr.addColorStop(0, th.hz(0.85)); gr.addColorStop(1, th.hz(0));
     ctx.fillStyle = gr; ctx.fillRect(0, HORIZON, W, 80);
     // the duel circle
     ctx.beginPath(); let pen = false;
@@ -575,8 +578,8 @@ export class BossFight {
       if (q.z < 40) { pen = false; continue; }
       if (pen) ctx.lineTo(q.x, q.y); else { ctx.moveTo(q.x, q.y); pen = true; }
     }
-    ctx.strokeStyle = 'rgba(25,224,176,.18)'; ctx.lineWidth = 14; ctx.stroke();
-    ctx.strokeStyle = 'rgba(25,224,176,.7)'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = th.b(0.18); ctx.lineWidth = 14; ctx.stroke();
+    ctx.strokeStyle = th.b(0.7); ctx.lineWidth = 3; ctx.stroke();
     ctx.globalAlpha = 1;
     // the play area, turning away
     if (aW > 0.003) {
@@ -587,7 +590,7 @@ export class BossFight {
     const b = this.boss, p = this.player, bm = mix(IC.bm0, IC.bm, Math.pow(cam.eR, 1.4)) * b.s;
     const fk = this.fix ? 1 - smooth(clamp(t / 2.6, 0, 1)) : 0;
     const figs = [
-      { key: 'boss', world: { x: IC.bx + b.x / IC.bk, y: -b.y / IC.bk, z: IC.bz }, pose: b.pose, face: -1, m: bm, zd: BZD, o: { view: 'front', color: BOSS_C, rgb: BOSS_RGB, headR: 15, sword: 150, bladeW: 4.5, twin: true } },
+      { key: 'boss', world: { x: IC.bx + b.x / IC.bk, y: -b.y / IC.bk, z: IC.bz }, pose: b.pose, face: -1, m: bm, zd: BZD, o: { view: 'front', ...this.rigLook() } },
       { key: 'player', world: { x: IC.px, y: 0, z: IC.pz }, pose: p.pose, face: 1, m: 1, zd: PZD, o: { view: 'back', color: PLAYER_C, rgb: PLAYER_RGB, headR: 13, sword: 96 * w.len / 60, bladeW: w.width + 1.2, twin: w.twin, blade: '#dffcff' } },
     ].map((f) => ({ ...f, base: P(f.world.x, f.world.y, f.world.z) })).filter((f) => f.base.z > 60).sort((f1, f2) => f2.base.z - f1.base.z);
     for (const f of figs) {
@@ -595,7 +598,7 @@ export class BossFight {
       if (fx && fk > 0) { r.x += fx.dx * fk; r.y += fx.dy * fk; r.s *= Math.pow(fx.k, fk); }
       const fa = 1 - aS, rx = 46 * r.s, ry = rx * clamp(cam.y / f.base.z, 0.12, 0.6);
       ctx.globalAlpha = fa; ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.ellipse(r.x, r.y + 2, rx, ry, 0, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
-      if (f.face < 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25 * fa * aA; ctx.drawImage(glowSprite('#19e0b0'), r.x - 2 * rx, r.y - ry * 2, 4 * rx, ry * 4); ctx.restore(); }
+      if (f.face < 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25 * fa * aA; ctx.drawImage(glowSprite(th.neon2), r.x - 2 * rx, r.y - ry * 2, 4 * rx, ry * 4); ctx.restore(); }
       if (fa > 0.003) drawRig(ctx, { ...f.o, ...r, alpha: fa });
     }
     // drifting motes: their parallax sells the turn
@@ -603,7 +606,7 @@ export class BossFight {
     for (const m of MOTES) {
       const y = (m.y + t * m.v) % 520, q = P(m.x, y, m.z); if (q.z < 60) continue;
       const r = clamp(2.6 * q.s, 0.7, 4); ctx.globalAlpha = aA * clamp(m.a * Math.min(1, (520 - y) / 120) * Math.min(1, q.s * 2) * clamp(1.6 - q.s, 0, 1), 0, 1);
-      ctx.drawImage(glowSprite(m.c), q.x - r * 3, q.y - r * 3, r * 6, r * 6);
+      ctx.drawImage(glowSprite(m.c === '#3dff9a' ? th.neon : m.c), q.x - r * 3, q.y - r * 3, r * 6, r * 6);
     }
     ctx.restore();
     // the walk in had its own vignette baked in; ours comes up as that picture goes
@@ -612,35 +615,36 @@ export class BossFight {
 
   /* ---------- drawing ---------- */
   makeBG() {
+    const th = this.th;
     const q = this.q || 1;
     const c = document.createElement('canvas'); c.width = Math.round(W * q); c.height = Math.round(H * q);
     const g = c.getContext('2d', { alpha: false });
     g.scale(q, q);
     let gr = g.createLinearGradient(0, 0, 0, HORIZON);
-    gr.addColorStop(0, '#000201'); gr.addColorStop(0.7, '#021209'); gr.addColorStop(1, '#063a22');
+    gr.addColorStop(0, th.sky[0]); gr.addColorStop(0.7, th.sky[1]); gr.addColorStop(1, th.horizon);
     g.fillStyle = gr; g.fillRect(0, 0, W, HORIZON);
     // a ring of pylons around the arena
     for (let i = 0; i < 18; i++) {
       const x = (i + 0.5) * W / 18, h = 110 + ((i * 37) % 60), w = 16 + (i % 3) * 4;
-      g.fillStyle = '#010b06'; g.fillRect(x - w / 2, HORIZON - h, w, h);
-      g.strokeStyle = 'rgba(61,255,154,.35)'; g.lineWidth = 1.5; g.strokeRect(x - w / 2, HORIZON - h, w, h);
-      g.fillStyle = 'rgba(25,224,176,.6)'; g.fillRect(x - 1, HORIZON - h - 26, 2, 26);
+      g.fillStyle = th.body; g.fillRect(x - w / 2, HORIZON - h, w, h);
+      g.strokeStyle = th.a(0.35); g.lineWidth = 1.5; g.strokeRect(x - w / 2, HORIZON - h, w, h);
+      g.fillStyle = th.b(0.6); g.fillRect(x - 1, HORIZON - h - 26, 2, 26);
     }
     const hz = g.createLinearGradient(0, HORIZON - 40, 0, HORIZON + 10);
-    hz.addColorStop(0, 'rgba(61,255,154,0)'); hz.addColorStop(1, 'rgba(61,255,154,.35)');
+    hz.addColorStop(0, th.a(0)); hz.addColorStop(1, th.a(0.35));
     g.fillStyle = hz; g.fillRect(0, HORIZON - 40, W, 50);
     // the floor: a receding grid
     gr = g.createLinearGradient(0, HORIZON, 0, H);
-    gr.addColorStop(0, '#021a0e'); gr.addColorStop(1, '#000503');
+    gr.addColorStop(0, th.floorTop); gr.addColorStop(1, th.floorBot);
     g.fillStyle = gr; g.fillRect(0, HORIZON, W, H - HORIZON);
-    g.strokeStyle = 'rgba(61,255,154,.28)'; g.lineWidth = 1.2;
+    g.strokeStyle = th.a(0.28); g.lineWidth = 1.2;
     for (let k = 1; k < 22; k++) { const y = HORIZON + (H - HORIZON) * Math.pow(k / 21, 2.1); g.globalAlpha = 0.3 + 0.7 * (k / 21); g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
     g.globalAlpha = 1;
     for (let i = -24; i <= 24; i++) { g.beginPath(); g.moveTo(VPX + i * 12, HORIZON); g.lineTo(VPX + i * 150, H); g.stroke(); }
     // the duel circle
-    g.strokeStyle = 'rgba(25,224,176,.7)'; g.lineWidth = 3;
+    g.strokeStyle = th.b(0.7); g.lineWidth = 3;
     g.beginPath(); g.ellipse(VPX, 560, 560, 150, 0, 0, 6.283); g.stroke();
-    g.strokeStyle = 'rgba(25,224,176,.18)'; g.lineWidth = 14; g.stroke();
+    g.strokeStyle = th.b(0.18); g.lineWidth = 14; g.stroke();
     this.bg = c;
     this.vig = makeVignette(q);
     bitmapify(this.vig, (bm) => { this.vig = bm; });
@@ -683,11 +687,11 @@ export class BossFight {
   drawWorld(ctx) {
     const b = this.bossPos(), p = this.player, w = this.w;
     ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.ellipse(b.x, BY + 2, 62 * b.s, 9 * b.s, 0, 0, 6.283); ctx.fill();
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25; ctx.drawImage(glowSprite('#19e0b0'), b.x - 90 * b.s, BY - 20, 180 * b.s, 40); ctx.restore();
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25; ctx.drawImage(glowSprite(this.th.neon2), b.x - 90 * b.s, BY - 20, 180 * b.s, 40); ctx.restore();
     const broken = this.mode === 'broken';
     let blade = null, brgb = null, bg = 0.3;
     if (this.tel) { const A = ATTACKS[this.tel.type]; blade = A.color; brgb = A.rgb; bg = 0.3 + 0.5 * this.tel.k; }
-    this.bossPts = drawRig(ctx, { pose: this.boss.pose, x: b.x, y: b.y, s: b.s, view: 'front', color: BOSS_C, rgb: BOSS_RGB, headR: 15, sword: 150, bladeW: 4.5, twin: true, blade, bladeRGB: brgb, bladeGlow: bg, hot: broken ? 0.5 + 0.5 * Math.sin(this.t * 22) : this.openings.some((o) => this.t >= o.start && this.t <= o.end) ? 0.5 : 0 });
+    this.bossPts = drawRig(ctx, { pose: this.boss.pose, x: b.x, y: b.y, s: b.s, view: 'front', ...this.rigLook(), blade, bladeRGB: brgb, bladeGlow: bg, hot: broken ? 0.5 + 0.5 * Math.sin(this.t * 22) : this.openings.some((o) => this.t >= o.start && this.t <= o.end) ? 0.5 : 0 });
     this.drawGhosts(ctx);
     if (this.tel && this.bossPts) {
       const A = ATTACKS[this.tel.type], k = clamp(this.tel.k, 0, 1), tip = this.bossPts.tip;
@@ -770,14 +774,14 @@ export class BossFight {
   }
   drawHUD(ctx, intro) {
     const s = this.g.save, mh = maxHP(s.stats);
-    txt(BOSS.name, W / 2, 30, 20, '#ffffff', 'center', 800);
-    bar(ctx, W / 2 - 300, 50, 600, 9, this.bossHP / BOSS.hp, '#f2fbff', 'rgba(255,255,255,.1)');
-    for (let i = 0; i < BOSS.phases.length; i++) {
+    txt(this.B.name, W / 2, 30, 20, '#ffffff', 'center', 800);
+    bar(ctx, W / 2 - 300, 50, 600, 9, this.bossHP / this.B.hp, this.B.look.color, 'rgba(255,255,255,.1)');
+    for (let i = 0; i < this.B.phases.length; i++) {
       const x = W / 2 + 316 + i * 18, y = 54, left = i >= this.phase;
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.fillStyle = left ? '#ffffff' : 'transparent';
       ctx.beginPath(); ctx.moveTo(x, y - 7); ctx.lineTo(x + 6, y); ctx.lineTo(x, y + 7); ctx.lineTo(x - 6, y); ctx.closePath(); if (left) ctx.fill(); ctx.stroke();
     }
-    const pf = clamp(this.bossPost / BOSS.poise, 0, 1);
+    const pf = clamp(this.bossPost / this.B.poise, 0, 1);
     ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(W / 2 - 252, 68, 504, 10);
     ctx.fillStyle = this.mode === 'broken' && Math.sin(this.t * 20) > 0 ? '#ffffff' : pf > 0.75 ? '#ffffff' : '#9fe8d4';
     ctx.fillRect(W / 2 - 250 * pf, 70, 500 * pf, 6);
@@ -802,7 +806,7 @@ export class BossFight {
         const a = age < 0.12 ? age / 0.12 : age > d - 0.35 ? (d - age) / 0.35 : 1;
         ctx.globalAlpha = a;
         ctx.fillStyle = 'rgba(0,8,4,.55)'; ctx.fillRect(0, 130, W, 120);
-        ctx.fillStyle = '#19e0b0'; ctx.fillRect(W / 2 - 300, 151, 600, 1); ctx.fillRect(W / 2 - 300, 236, 600, 1);
+        ctx.fillStyle = this.th.neon2; ctx.fillRect(W / 2 - 300, 151, 600, 1); ctx.fillRect(W / 2 - 300, 236, 600, 1);
         txt(this.banner.s, W / 2, 186, 50 * (1 + 0.1 * Math.max(0, 1 - age * 6)), this.banner.c, 'center', 800);
         if (this.banner.sub) txt(this.banner.sub, W / 2, 222, 17, '#cfeedd', 'center', 500);
         ctx.globalAlpha = 1;

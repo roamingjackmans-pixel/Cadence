@@ -1,8 +1,10 @@
 // The conductor's promise: whatever phrases two attackers ask for, the strikes it schedules can all be answered
-// perfectly. Fuzzes every enemy's phrases (and the boss's) against each other and checks the merged timeline.
+// perfectly. Fuzzes every enemy's phrases, at the speeds of the first and last zones, against each other, and every
+// warden's phases, and checks the merged timelines. Also checks every phrase can be played at its speed at all.
 //   node tools/test-conductor.mjs
 import { Conductor, parsePhrase, survivable } from '../src/combat.js';
-import { ENEMIES, BOSS, MIN_GAP, FAST_PAIR, JUMP_AIR } from '../src/data.js';
+import { ENEMIES, MIN_GAP, FAST_PAIR, JUMP_AIR } from '../src/data.js';
+import { ZONES, foeDef } from '../src/zones.js';
 
 let fails = 0, planned = 0;
 const fail = (msg) => { fails++; if (fails <= 10) console.error('FAIL ' + msg); };
@@ -30,7 +32,18 @@ function check(notes, label) {
   if (!survivable(s)) fail(`${label}: no perfect answer for ${s.map((n) => n.type[1] + n.time.toFixed(2)).join(' ')}`);
 }
 
-const kinds = Object.values(ENEMIES);
+// a phrase whose own strikes come closer than MIN_GAP could never be scheduled
+const playable = (phrase, beat, label) => {
+  const r = parsePhrase(phrase, beat);
+  for (let i = 1; i < r.length; i++) if (r[i].dt - r[i - 1].dt < MIN_GAP - 1e-6) return fail(label + ': ' + phrase + ' at beat ' + beat.toFixed(3) + ' is too fast to schedule');
+  if (!survivable(r.map((x) => ({ type: x.type, time: x.dt })))) fail(label + ': ' + phrase + ' has no perfect answer alone');
+};
+for (const z of ZONES) {
+  for (const type of Object.keys(ENEMIES)) { const d = foeDef(type, z.id); for (const ph of d.phrases) playable(ph, d.beat, 'zone ' + z.id + ' ' + d.name); }
+  for (const ph of z.boss.phases) for (const x of ph.phrases) playable(x, ph.beat, z.boss.short);
+}
+
+const kinds = [...Object.keys(ENEMIES).map((k) => foeDef(k, 1)), ...Object.keys(ENEMIES).map((k) => foeDef(k, 12))];
 for (let round = 0; round < 3000; round++) {
   const c = new Conductor();
   const A = pick(kinds), B = pick(kinds), a = { n: 'A' }, b = { n: 'B' };
@@ -43,11 +56,11 @@ for (let round = 0; round < 3000; round++) {
   }
   check(c.notes, `round ${round} ${A.name} + ${B.name}`);
 }
-for (const ph of BOSS.phases) for (let round = 0; round < 300; round++) {
+for (const z of ZONES) for (const ph of z.boss.phases) for (let round = 0; round < 60; round++) {
   const c = new Conductor(), boss = {};
   let t = 0;
   for (let k = 0; k < 4; k++) { if (c.plan(boss, pick(ph.phrases), ph.beat, t + 1, t, { maxShift: 0.6 })) planned++; t += 1.5 + rand(); }
-  check(c.notes, `boss beat ${ph.beat} round ${round}`);
+  check(c.notes, `${z.boss.short} beat ${ph.beat.toFixed(3)} round ${round}`);
 }
 console.log(`${planned} phrases planned; FAST_PAIR ${FAST_PAIR}s, JUMP_AIR ${JUMP_AIR}s, MIN_GAP ${MIN_GAP}s`);
 if (fails) { console.error(`${fails} failure(s)`); process.exit(1); }
