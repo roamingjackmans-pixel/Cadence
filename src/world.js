@@ -1,6 +1,6 @@
 // The side-scrolling world: movement, enemies, the rhythm combat, beacons, items and death.
 import { W, H, clamp, rnd, pick, sign } from './util.js';
-import { ATTACKS, ENEMIES, WEAPONS, BASE_WIN, DUR, LEAD, ACT_NAME, maxHP, swordDmg, powerDmg, COMBO_REST } from './data.js';
+import { ATTACKS, ENEMIES, WEAPONS, BASE_WIN, DUR, LEAD, FAST_PAIR, ACT_NAME, maxHP, swordDmg, powerDmg, COMBO_REST } from './data.js';
 import { Conductor } from './combat.js';
 import { T } from './level.js';
 import { buildZone, zoneById, foeDef } from './zones.js';
@@ -850,25 +850,59 @@ export class World {
   drawEnemyUI(ctx, e) {
     const t = this.t, p = this.p, s = this.g.save;
     const dir = sign(p.x - e.x) || 1, top = e.y - e.h - 30;
-    const mine = this.cond.notes.filter((n) => n.owner === e && !n.cancelled && !n.applied && n.time - t < (n.lead || LEAD) && n.time - t > -0.12);
+    const mine = this.cond.notes.filter((n) => n.owner === e && !n.cancelled && !n.applied && n.time - t > -0.12).sort((a, b) => a.time - b.time);
     const broken = e.brokenUntil > t;
     if (e.state === 'aggro' && (e.slot || mine.length)) {
       const len = 150, mx = e.x + dir * 30, x0 = mx - dir * len;
       ctx.strokeStyle = 'rgba(233,251,255,.22)'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(x0, top); ctx.lineTo(mx, top); ctx.stroke();
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(mx, top - 11); ctx.lineTo(mx, top + 11); ctx.stroke();
-      for (let i = mine.length - 1; i >= 0; i--) {
-        const n = mine[i], u = (n.time - t) / (n.lead || LEAD), x = mx - dir * len * Math.max(0, u), A = ATTACKS[n.type];
-        const a = u > 0.85 ? (1 - u) / 0.15 : 1, r = 9 + (u < 0.08 ? 3 : 0);
-        ctx.globalAlpha = a;
-        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(glowSprite(A.color), x - r * 2.4, top - r * 2.4, r * 4.8, r * 4.8); ctx.restore();
-        ctx.fillStyle = A.color; ctx.beginPath(); ctx.arc(x, top, r, 0, 6.283); ctx.fill();
-        // the shape says the answer too: a line high, a line low, or an arrow down
+      // strikes too close to block back to back (under FAST_PAIR apart) share one long pill, split in their two colours
+      // (owner): the half nearer the marker is the first strike
+      const groups = [];
+      for (let i = 0; i < mine.length; i++) {
+        const n = mine[i], m = mine[i + 1];
+        if (m && m.time - n.time < FAST_PAIR) { groups.push([n, m]); i++; } else groups.push([n]);
+      }
+      const sym = (type, x) => {
         ctx.strokeStyle = '#140308'; ctx.fillStyle = '#140308'; ctx.lineWidth = 2.5;
-        if (n.type === 'slash') { ctx.beginPath(); ctx.moveTo(x - 5, top - 3); ctx.lineTo(x + 5, top - 3); ctx.stroke(); }
-        else if (n.type === 'sweep') { ctx.beginPath(); ctx.moveTo(x - 5, top + 4); ctx.lineTo(x + 5, top + 4); ctx.stroke(); }
+        if (type === 'slash') { ctx.beginPath(); ctx.moveTo(x - 5, top - 3); ctx.lineTo(x + 5, top - 3); ctx.stroke(); }
+        else if (type === 'sweep') { ctx.beginPath(); ctx.moveTo(x - 5, top + 4); ctx.lineTo(x + 5, top + 4); ctx.stroke(); }
         else { ctx.beginPath(); ctx.moveTo(x - 5, top - 3); ctx.lineTo(x + 5, top - 3); ctx.lineTo(x, top + 5); ctx.closePath(); ctx.fill(); }
-        if (s.hints && u < 0.6 && i === 0) txt(A.valid.map((v) => ({ duck: 'DUCK', jump: 'JUMP', dodge: 'STEP', block: 'BLOCK' }[v])).join(' · '), x, top - 22, 12, A.color);
+      };
+      const posOf = (n) => { const u = (n.time - t) / (n.lead || LEAD); return { u, x: mx - dir * len * Math.max(0, u) }; };
+      for (let gi = groups.length - 1; gi >= 0; gi--) {
+        const g = groups[gi], n = g[0], A = ATTACKS[n.type], { u, x } = posOf(n);
+        if (u >= 1) continue;
+        const a = u > 0.85 ? (1 - u) / 0.15 : 1, landing = u < 0.08 ? 3 : 0;
+        ctx.globalAlpha = a;
+        if (g.length === 1) {
+          const r = 9 + landing;
+          ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(glowSprite(A.color), x - r * 2.4, top - r * 2.4, r * 4.8, r * 4.8); ctx.restore();
+          ctx.fillStyle = A.color; ctx.beginPath(); ctx.arc(x, top, r, 0, 6.283); ctx.fill();
+          sym(n.type, x);
+        } else {
+          // one oval pill: the first strike's half toward the marker, the second's behind it
+          const B = ATTACKS[g[1].type], x2 = posOf(g[1]).x, r = 11 + landing;
+          const half = Math.max(Math.abs(x2 - x) / 2 + r * 0.6, r + 9), cx = (x + x2) / 2;
+          const pill = () => { ctx.beginPath(); ctx.ellipse(cx, top, half + r * 0.4, r, 0, 0, 6.283); };
+          ctx.save(); ctx.globalCompositeOperation = 'lighter';
+          ctx.drawImage(glowSprite(A.color), cx + dir * half * 0.5 - r * 2.6, top - r * 2.6, r * 5.2, r * 5.2);
+          ctx.drawImage(glowSprite(B.color), cx - dir * half * 0.5 - r * 2.6, top - r * 2.6, r * 5.2, r * 5.2);
+          ctx.restore();
+          for (const [C, side] of [[A, 1], [B, -1]]) {
+            ctx.save(); pill(); ctx.clip();
+            ctx.beginPath(); ctx.rect(side * dir > 0 ? cx : cx - half - r, top - r - 2, half + r, r * 2 + 4); ctx.fillStyle = C.color; ctx.fill();
+            ctx.restore();
+          }
+          ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1.5; pill(); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(cx, top - r + 2); ctx.lineTo(cx, top + r - 2); ctx.strokeStyle = 'rgba(20,3,8,.6)'; ctx.stroke();
+          sym(n.type, cx + dir * half * 0.5); sym(g[1].type, cx - dir * half * 0.5);
+        }
+        if (s.hints && u < 0.6 && gi === 0) {
+          const say = (q) => ATTACKS[q.type].valid.filter((v) => g.length === 1 || v !== 'block').map((v) => ({ duck: 'DUCK', jump: 'JUMP', dodge: 'STEP', block: 'BLOCK' }[v])).join(' · ');
+          txt(g.length === 1 ? say(n) : say(n) + '  then  ' + ATTACKS[g[1].type].valid.map((v) => ({ duck: 'DUCK', jump: 'JUMP', dodge: 'STEP', block: 'BLOCK' }[v])).join(' · '), x, top - 22, 12, A.color);
+        }
         ctx.globalAlpha = 1;
       }
     }

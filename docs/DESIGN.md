@@ -27,7 +27,8 @@ No thrust (the prototype's stab is gone) **(owner)**. Every enemy uses all three
 ## Reading the rhythm
 
 Cadence pips **(owner)**: each attacker has a track above its head; pips for its next strikes slide toward the beat
-marker nearest you and arrive as the strike lands (1.5 s lead). The blade also glows the strike's colour through the
+marker nearest you and arrive as the strike lands (1.5 s lead). Two strikes too close to block back to back (under
+`FAST_PAIR`) share one long oval pill split in their two colours, the first strike's half toward the marker **(owner)**. The blade also glows the strike's colour through the
 wind-up. `I` toggles answer hints (on by default).
 
 ## Two attackers
