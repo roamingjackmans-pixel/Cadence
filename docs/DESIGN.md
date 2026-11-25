@@ -29,7 +29,7 @@ No thrust (the prototype's stab is gone) **(owner)**. Every enemy uses all three
 Cadence pips **(owner)**: each attacker has a track above its head; pips for its next strikes slide toward the beat
 marker nearest you and arrive as the strike lands (1.5 s lead). Two strikes too close to block back to back (under
 `FAST_PAIR`) share one long oval pill split in their two colours, the first strike's half toward the marker **(owner)**. The blade also glows the strike's colour through the
-wind-up. `I` toggles answer hints (on by default).
+wind-up. `I` toggles answer hints. They and the button prompts in fights (power strike, the duel controls) show until the first warden falls; then hints switch off once, and `I` brings them all back.
 
 ## Two attackers
 
@@ -62,7 +62,7 @@ You have no stamina, only poise **(owner)**: blocks and guarded hits fill it; fu
 Levels and stats **(owner)**: echoes (dropped by enemies) buy levels at beacons. Stats: Vitality (+9 health), Guard
 (blocks fill your poise 4% less), Strength and Finesse (damage scaling), Focus (timing windows 1.5% wider). Die and your
 echoes stay where you fell; reach them to take them back, die first and they are gone. Resting at a beacon heals,
-refills flasks (none to start with: one per Lumen Shard) and brings every enemy back. Beacons let you travel between them.
+refills flasks (none to start with: one per Lumen Shard: four in all, two in the Verdant Circuit, one each in the Cobalt Depths and the Null Expanse) and brings every enemy back. Beacons let you travel between them.
 
 Swords **(owner)**: each class has block windows per strike and evade windows per move (`src/data.js` WEAPONS):
 

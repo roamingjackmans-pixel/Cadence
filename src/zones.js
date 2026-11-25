@@ -94,6 +94,8 @@ function recipe(z) {
       for (const p of parts) {
         if (p.startsWith('beacon:')) { k++; b.beacon(`z${z.id}b${k}`, p.slice(7)); continue; }
         if (p === 'shard') { AREAS.vault(b, R, { kind: 'flask', id: `z${z.id}-shard` }); continue; }
+        // (owner) every second Lumen Shard is gone: its vault holds echoes instead, so the layout stays the same
+        if (p === 'shardless') { AREAS.vault(b, R, { kind: 'echoes', amount: z.cache, id: `z${z.id}-shardless` }); continue; }
         AREAS[p](b, R);
       }
     }
@@ -144,7 +146,7 @@ export const ZONES = [
   {
     id: 3, name: 'The Glasswork Spires', theme: P('#4fc3ff', '#2a8cff', 'spires'), music: { shift: 3, bpm: 4 },
     foes: ['lancer', 'duelist', 'wisp', 'sentinel'], elite: 'duelist', cache: 520,
-    areas: [['Prism Gate', 'beacon:Prism Gate', 'rise'], ['The Needles', 'tower', 'bridge'], ['Refraction Hall', 'gauntlet', 'shard'],
+    areas: [['Prism Gate', 'beacon:Prism Gate', 'rise'], ['The Needles', 'tower', 'bridge'], ['Refraction Hall', 'gauntlet', 'shardless'],
       ['Mirror Court', 'beacon:Mirror Court', 'duel', 'drop'], ['The Upper Panes', 'tower', 'ambush', 'pits']],
     boss: {
       name: 'THE GLASS DUCHESS', sub: 'Warden of the Glasswork Spires', short: 'The Glass Duchess', w: [1.7, 0.9, 0.7],
@@ -210,7 +212,7 @@ export const ZONES = [
   {
     id: 9, name: 'The Overgrowth', theme: P('#2fe07a', '#13a85a', 'spires'), music: { shift: 2, bpm: -4 },
     foes: ['shardling', 'wisp', 'hammer', 'blademaster'], elite: 'hammer', cache: 1750,
-    areas: [['Root Gate', 'beacon:Root Gate', 'drop'], ['The Tangle', 'ambush', 'gauntlet'], ['Thorn Galleries', 'steps', 'shard'],
+    areas: [['Root Gate', 'beacon:Root Gate', 'drop'], ['The Tangle', 'ambush', 'gauntlet'], ['Thorn Galleries', 'steps', 'shardless'],
       ['The Canopy', 'beacon:The Canopy', 'tower', 'bridge'], ['Bramble Court', 'duel', 'under', 'pits']],
     boss: {
       name: 'THE THORNED KNIGHT', sub: 'Warden of the Overgrowth', short: 'The Thorned Knight', w: [1.1, 1.6, 1],
@@ -244,7 +246,7 @@ export const ZONES = [
     id: 12, name: 'The Heart of the Circuit', theme: P('#eafff3', '#3dff9a', 'rings'), music: { shift: 0, bpm: 10 },
     foes: ['blademaster', 'warden', 'lancer', 'wisp', 'duelist', 'hammer'], elite: 'blademaster', cache: 2700,
     areas: [['The Pulse', 'beacon:The Pulse', 'rise', 'gauntlet'], ['Arteries', 'pits', 'under'], ['The Chambers', 'ambush', 'duel'],
-      ['The Core Stair', 'beacon:The Core Stair', 'tower', 'shard'], ['The Last Measure', 'bridge', 'gauntlet', 'duel', 'steps']],
+      ['The Core Stair', 'beacon:The Core Stair', 'tower', 'shardless'], ['The Last Measure', 'bridge', 'gauntlet', 'duel', 'steps']],
     ante: 'The Podium',
     boss: {
       name: 'THE CONDUCTOR', sub: 'Keeper of the First Rhythm', short: 'The Conductor', w: [1, 1, 1],

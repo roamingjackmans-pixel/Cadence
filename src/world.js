@@ -1,6 +1,6 @@
 // The side-scrolling world: movement, enemies, the rhythm combat, beacons, items and death.
 import { W, H, clamp, rnd, pick, sign } from './util.js';
-import { ATTACKS, ENEMIES, WEAPONS, BASE_WIN, DUR, LEAD, FAST_PAIR, ACT_NAME, maxHP, swordDmg, powerDmg, COMBO_REST } from './data.js';
+import { ATTACKS, ENEMIES, WEAPONS, BASE_WIN, DUR, LEAD, FAST_PAIR, ACT_NAME, maxHP, swordDmg, powerDmg, COMBO_REST, fightWords } from './data.js';
 import { Conductor } from './combat.js';
 import { T } from './level.js';
 import { buildZone, zoneById, foeDef } from './zones.js';
@@ -922,7 +922,7 @@ export class World {
       const x = e.x, y = top - 4, k = 1 + 0.08 * Math.sin(t * 12);
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(glowSprite('#ffffff'), x - 30 * k, y - 30 * k, 60 * k, 60 * k); ctx.restore();
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x, y - 14 * k); ctx.lineTo(x + 14 * k, y); ctx.lineTo(x, y + 14 * k); ctx.lineTo(x - 14 * k, y); ctx.closePath(); ctx.stroke();
-      txt(btn('attack') + '  POWER STRIKE', x, y - 28, 13, '#ffffff');
+      if (fightWords(this.g.save)) txt(btn('attack') + '  POWER STRIKE', x, y - 28, 13, '#ffffff');
     }
   }
 

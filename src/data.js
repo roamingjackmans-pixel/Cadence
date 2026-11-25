@@ -129,6 +129,8 @@ export const swordDmg = (w, s) => w.dmg * (1 + 0.12 * (s.upgrades[s.equipped] ||
  *  of the Twin Dancer (120) in one blow, the Twin Fangs in about two, the Arming Sword in two. */
 export const POWER = 4.2;
 /** The pause after an opening before the next combo, as a share of each foe's and warden's rest (owner: shorter). */
+/** The fight words (answer hints, button prompts) teach the first zone; once its warden is down (owner) they show only if hints are switched back on. */
+export const fightWords = (s) => s.hints || !s.bosses.includes(1);
 export const COMBO_REST = 0.55;
 export const powerDmg = (w, s) => swordDmg(w, s) * w.hits.length * POWER;
 

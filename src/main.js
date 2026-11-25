@@ -17,7 +17,7 @@ const ctx = cv.getContext('2d', { alpha: false });
 
 // gates: shortcut gates opened; bosses: zones whose warden is dead; shade: your lost echoes {zone, x, y, amount}
 function freshSave() {
-  return { v: 2, stats: { vit: BASE_STAT, guard: BASE_STAT, str: BASE_STAT, fin: BASE_STAT, focus: BASE_STAT }, echoes: 0, upgrades: { arming: 0 }, equipped: 'arming', flasks: 0, flasksMax: 0, lit: [], beacon: 'b1', taken: [], gates: [], bosses: [], shade: null, hints: true, deaths: 0, kills: 0 };
+  return { v: 2, stats: { vit: BASE_STAT, guard: BASE_STAT, str: BASE_STAT, fin: BASE_STAT, focus: BASE_STAT }, echoes: 0, upgrades: { arming: 0 }, equipped: 'arming', flasks: 0, flasksMax: 0, lit: [], beacon: 'b1', taken: [], gates: [], bosses: [], shade: null, hints: true, hintsRetired: false, deaths: 0, kills: 0 };
 }
 /** A save from before the twelve zones (v1) becomes v2: its gate, its boss, and its echoes if they still lie in the old part of the map. */
 function migrate(s) {
@@ -26,6 +26,7 @@ function migrate(s) {
     if (s.shade) s.shade = s.shade.x < 201 * T ? { ...s.shade, zone: 1 } : null;
     delete s.gateOpen; delete s.bossDead; s.v = 2;
   }
+  if (!s.hintsRetired && s.bosses.includes(1)) { s.hints = false; s.hintsRetired = true; }
   return s;
 }
 function loadSave() {
@@ -93,6 +94,7 @@ const game = {
     if (result === 'win') {
       const first = !s.bosses.includes(z.id), rw = WEAPONS[B.reward];
       if (first) s.bosses.push(z.id);
+      if (z.id === 1 && !s.hintsRetired) { s.hints = false; s.hintsRetired = true; }
       s.echoes += B.echoes; if (s.upgrades[B.reward] === undefined) s.upgrades[B.reward] = 0;
       this.persist();
       w.cut = null; w.p.hp = Math.max(1, hp); w.p.x = w.L.arena.x0 + 8 * 32; w.p.y = w.L.arena.floor;

@@ -231,7 +231,7 @@ export function verdantPrefix(b) {
     [{ id: 'cache2', kind: 'echoes', amount: 200 }, 70, 27],
     [{ id: 'nightedge', kind: 'weapon', weapon: 'nightedge' }, 150, 42],
     [{ id: 'cache3', kind: 'echoes', amount: 260 }, 160, 42],
-    [{ id: 'shard2', kind: 'flask' }, 183, 29],
+    [{ id: 'cache3b', kind: 'echoes', amount: 240 }, 183, 29],   // was the second Lumen Shard
   ]) b.item(it, c, r);
   b.beacons.push({ id: 'b1', name: 'Boot Chamber', c: 9, r: 25 }, { id: 'b2', name: 'Junction', c: 132, r: 38 });
   // the shortcut gate: opens only from the right

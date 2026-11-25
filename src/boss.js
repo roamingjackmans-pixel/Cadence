@@ -1,6 +1,6 @@
 // The duel with the Twin Dancer, seen from behind you: the prototype's view, restyled and without the music chart.
 import { W, H, clamp, rnd, pick, smooth, wrapA, makeCanvas, bitmapify } from './util.js';
-import { ATTACKS, WEAPONS, BASE_WIN, JUMP_AIR, ACT_NAME, maxHP, swordDmg, powerDmg, COMBO_REST } from './data.js';
+import { ATTACKS, WEAPONS, BASE_WIN, JUMP_AIR, ACT_NAME, maxHP, swordDmg, powerDmg, COMBO_REST, fightWords } from './data.js';
 import { Conductor } from './combat.js';
 import { FX, glowSprite } from './fx.js';
 import { input, btn } from './input.js';
@@ -254,7 +254,7 @@ export class BossFight {
     this.bossPost = this.B.poise; this.mode = 'broken'; this.brokenAt = this.t;
     this.cond.cancelOwner(this, this.t, true); this.openings = [];
     const b = this.bossPos(); this.fx.sparks(b.x, b.y - 150 * b.s, 34, '#ffffff', 750);
-    this.showBanner('POISE BROKEN', btn('attack') + '  Power strike', '#ffffff', 1.6); sfx('brk');
+    this.showBanner('POISE BROKEN', fightWords(this.g.save) ? btn('attack') + '  Power strike' : '', '#ffffff', 1.6); sfx('brk');
   }
   resolveHit(a) {
     const t = this.t, p = this.player, w = this.w, s = this.g.save;
@@ -296,7 +296,7 @@ export class BossFight {
       this.fx.sparks(hx, hy, 46, '#ffffff', 950); this.fx.cut(hx, hy, -0.6, 380, '#ffffff', 0.32, 10); this.fx.ring(hx, hy, '#ffffff', 180, 0.4, 6);
       this.flash = { c: '230,255,250', a: 0.3 }; this.shake = 15; this.hitstop = 0.12; this.boss.flinchUntil = t + 0.4; this.boss.recoil = { t0: t, amt: 1.2 };
       sfx('lethal');
-      this.showBanner('POWER STRIKE', 'Break its poise again to finish the phase', '#ffffff', 1.4);
+      this.showBanner('POWER STRIKE', fightWords(this.g.save) ? 'Break its poise again to finish the phase' : '', '#ffffff', 1.4);
       this.mode = 'play'; this.bossPost = 0; this.nextPlan = t + 1;
       return;
     }
@@ -748,7 +748,7 @@ export class BossFight {
       const age = this.t - this.grade.t0;
       if (age < 0.75) { ctx.globalAlpha = age < 0.5 ? 1 : 1 - (age - 0.5) / 0.25; txt(this.grade.s, PX - 240, 470 - age * 20, 34 * (1 + 0.45 * Math.max(0, 1 - age * 9)), this.grade.c); ctx.globalAlpha = 1; }
     }
-    if (this.mode === 'broken') { const h = this.bossPts.head; txt(btn('attack') + '  POWER STRIKE', h.x, h.y - 70, 18, '#ffffff'); }
+    if (this.mode === 'broken' && fightWords(this.g.save)) { const h = this.bossPts.head; txt(btn('attack') + '  POWER STRIKE', h.x, h.y - 70, 18, '#ffffff'); }
   }
   /* incoming swings: only the blade, flying in from behind the dancer */
   drawGhosts(ctx) {
@@ -781,7 +781,7 @@ export class BossFight {
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = (slam ? 4.5 : 2.5) * gs + 1; ctx.stroke();
       ctx.fillStyle = A.color; ctx.beginPath(); ctx.arc(g.x, g.y, 6 * gs + 2, 0, 6.283); ctx.fill();
       ctx.restore();
-      if (s.hints || this.phase === 0) { ctx.globalAlpha = a; txt(A.valid.map((v) => ({ duck: 'DUCK', jump: 'JUMP', dodge: 'STEP', block: 'BLOCK' }[v])).join(' · '), g.x, Math.min(g.y, tp.y) - 18, 13 + 3 * gs, A.color); ctx.globalAlpha = 1; }
+      if (s.hints || (this.phase === 0 && fightWords(s))) { ctx.globalAlpha = a; txt(A.valid.map((v) => ({ duck: 'DUCK', jump: 'JUMP', dodge: 'STEP', block: 'BLOCK' }[v])).join(' · '), g.x, Math.min(g.y, tp.y) - 18, 13 + 3 * gs, A.color); ctx.globalAlpha = 1; }
     }
   }
   drawTrail(ctx, f) {
@@ -822,7 +822,7 @@ export class BossFight {
       ctx.beginPath(); ctx.moveTo(x, y - 7); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 7); ctx.lineTo(x - 5, y); ctx.closePath(); if (full) ctx.fill(); ctx.stroke();
     }
     txt(this.w.name.toUpperCase(), W - 40, H - 40, 13, '#dffbea', 'right');
-    txt(btn('dodge') + ' / ←→ step   ' + btn('jump') + ' jump   ' + btn('duck') + ' duck   ' + btn('block') + ' block   ' + btn('attack') + ' strike', W - 40, H - 20, 11, 'rgba(223,251,234,.45)', 'right', 600);
+    if (fightWords(s)) txt(btn('dodge') + ' / ←→ step   ' + btn('jump') + ' jump   ' + btn('duck') + ' duck   ' + btn('block') + ' block   ' + btn('attack') + ' strike', W - 40, H - 20, 11, 'rgba(223,251,234,.45)', 'right', 600);
     if (!intro) this.drawBanner(ctx);
   }
   drawBanner(ctx) {
