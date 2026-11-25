@@ -18,6 +18,9 @@ const VW = W / Z, VH = H / Z;
 // JV is the full jump (held for height), HOP the small jump on RT: about a tile and a quarter
 // RUN_STRIDES: run keys per pixel moved: 2.4 strides a second at full speed
 const RUN_STRIDES = 4 * 2.4 / 255;
+// PLAN_AHEAD: a phrase is planned this long before the old 1.05 s start, so the gap between combos is unchanged while
+// the first pip gets the whole line. COUNTER: the lead of the counter when you strike into a guard.
+const PLAN_AHEAD = LEAD - 1.05, COUNTER = 0.75;
 const RUN = 255, JV = 780, HOP = 440, NEAR_FOE = 155, GRAV = 2600, MAXFALL = 1100, STEP = 1 / 120;
 const wrap = (s, n) => { const out = []; let cur = ''; for (const w of s.split(' ')) { if (cur && (cur + ' ' + w).length > n) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; } if (cur) out.push(cur); return out; };
 const PLAYER_C = '#5ff3ff', PLAYER_RGB = '95,243,255';
@@ -345,13 +348,14 @@ export class World {
       let phrases = e.force ? [e.force] : def.phrases;   // the tutorial's echo plays one phrase on repeat
       if (twoOn) phrases = phrases.filter((x) => x.replace(/-/g, '').length <= 2);
       const ph = pick(phrases.length ? phrases : def.phrases);
-      const notes = this.cond.plan(e, ph, def.beat, t + 1.05, t, {
+      // the first strike lands a full LEAD out, so its pip starts at the far end of the line
+      const notes = this.cond.plan(e, ph, def.beat, t + LEAD, t, {
         side: sign(e.x - p.x), maxShift: twoOn ? 1.4 : 0.6,
         chamber: (type, gap) => Math.min(type === 'slam' ? 0.5 : 0.42, Math.max(0.17, gap * 0.85)),
       });
       if (notes) {
         const last = notes[notes.length - 1].time;
-        e.openStart = last + 0.14; e.openEnd = e.openStart + def.open; e.nextPlan = e.openEnd + rnd(def.rest[0], def.rest[1]) * COMBO_REST * (twoOn ? 1.3 : 1);
+        e.openStart = last + 0.14; e.openEnd = e.openStart + def.open; e.nextPlan = e.openEnd + rnd(def.rest[0], def.rest[1]) * COMBO_REST * (twoOn ? 1.3 : 1) - PLAN_AHEAD;
       } else e.nextPlan = t + 0.3;
     }
     this.animEnemy(e, dt, striking);
@@ -372,7 +376,7 @@ export class World {
         if (t >= n.time) { if (nx && t >= nx.time - nx.chamber) continue; pose = POSES[n.type + 'S']; rate = 50; done = true; break; }
         const cs = n.time - n.chamber;
         if (t >= cs) { pose = POSES[n.type + 'W']; rate = n.chamber < 0.25 ? 55 : 30; e.tel = { type: n.type, k: (t - cs) / n.chamber }; done = true; break; }
-        if (n.time - t < LEAD) { e.tel = { type: n.type, k: 0 }; }
+        if (n.time - t < (n.lead || LEAD)) { e.tel = { type: n.type, k: 0 }; }
         break;
       }
       if (!done && t >= e.openStart && t <= e.openEnd) { pose = POSES.open; rate = 12; }
@@ -532,7 +536,8 @@ export class World {
       this.gainPoise(e, 1.2); p.poise += 5 * w.guardCost; p.atkReady = Math.max(p.atkReady, t + 0.22);
       this.fx.sparks(tipX, tipY, 10, '#ffffff', 420); this.fx.float('GUARDED', e.x, e.y - e.h - 16, '#cfe9e0', 14); sfx('guarded');
       if (e.slot && Math.random() < 0.6 && !this.cond.notes.some((n) => n.owner === e && !n.applied && n.time < t + 1.1)) {
-        this.cond.plan(e, pick(['R', 'Y', 'R']), e.def.beat, t + 0.55, t, { side: sign(e.x - p.x), maxShift: 0.3, chamber: () => 0.3 });
+        // a quick counter: its pip runs the whole line, just faster
+        this.cond.plan(e, pick(['R', 'Y', 'R']), e.def.beat, t + COUNTER, t, { side: sign(e.x - p.x), maxShift: 0.3, chamber: () => 0.3, extra: { lead: COUNTER } });
       }
       this.checkBreak(e);
     }
@@ -844,7 +849,7 @@ export class World {
   drawEnemyUI(ctx, e) {
     const t = this.t, p = this.p, s = this.g.save;
     const dir = sign(p.x - e.x) || 1, top = e.y - e.h - 30;
-    const mine = this.cond.notes.filter((n) => n.owner === e && !n.cancelled && !n.applied && n.time - t < LEAD && n.time - t > -0.12);
+    const mine = this.cond.notes.filter((n) => n.owner === e && !n.cancelled && !n.applied && n.time - t < (n.lead || LEAD) && n.time - t > -0.12);
     const broken = e.brokenUntil > t;
     if (e.state === 'aggro' && (e.slot || mine.length)) {
       const len = 150, mx = e.x + dir * 30, x0 = mx - dir * len;
@@ -852,7 +857,7 @@ export class World {
       ctx.beginPath(); ctx.moveTo(x0, top); ctx.lineTo(mx, top); ctx.stroke();
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(mx, top - 11); ctx.lineTo(mx, top + 11); ctx.stroke();
       for (let i = mine.length - 1; i >= 0; i--) {
-        const n = mine[i], u = (n.time - t) / LEAD, x = mx - dir * len * Math.max(0, u), A = ATTACKS[n.type];
+        const n = mine[i], u = (n.time - t) / (n.lead || LEAD), x = mx - dir * len * Math.max(0, u), A = ATTACKS[n.type];
         const a = u > 0.85 ? (1 - u) / 0.15 : 1, r = 9 + (u < 0.08 ? 3 : 0);
         ctx.globalAlpha = a;
         ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(glowSprite(A.color), x - r * 2.4, top - r * 2.4, r * 4.8, r * 4.8); ctx.restore();

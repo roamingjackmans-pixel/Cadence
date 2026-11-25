@@ -279,7 +279,8 @@ export class BossFight {
       this.fx.sparks(hx - 40, hy + 30, 12, '#ffffff', 480); this.fx.flare(hx - 40, hy + 30, '#ffffff', 200, 0.16);
       this.boss.recoil = { t0: t, amt: 0.3 }; this.fx.float('GUARDED', hx, hy - 100, '#cfe9e0', 20); sfx('guarded');
       if (Math.random() < 0.75 && !this.cond.notes.some((n) => !n.applied && n.time < t + 1.15) && !this.openings.some((o) => o.end > t - 0.1 && o.start < t + 1.15)) {
-        this.cond.plan(this, pick(['R', 'Y', 'R']), 0.5, t + 0.55, t, { maxShift: 0.3, chamber: () => 0.34, extra: this.noteExtra() });
+        // a quick counter: its blade flies the whole way in, just faster
+        this.cond.plan(this, pick(['R', 'Y', 'R']), 0.5, t + 0.75, t, { maxShift: 0.3, chamber: () => 0.34, extra: { lead: 0.75 } });
         this.sideNotes();
       }
       this.checkPosture();
