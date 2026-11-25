@@ -43,8 +43,14 @@ Block faces the attacker the stick (or A/D) points at; duck, jump and step work 
 
 Sekiro rules **(owner)**: your strikes in an enemy's opening (the recovery after each phrase) take health; your answers
 fill its poise (deflect 7.5, perfect evade 9.75, block 2.5, evade 3.25, a whole phrase perfect +10 and it is thrown
-back). Full poise, or no health left, breaks it: a lethal strike kills a regular enemy outright. The boss needs three.
+back). Full poise, or no health left, breaks it and opens it to a power strike **(owner)**: every cut of one swing at
+four times its damage (`powerDmg` in `src/data.js`), so heavier and better swords hit harder. Health left after it and
+the foe staggers and recovers with no poise; none and it dies, or a warden's phase ends. At the start the Monolith
+ends a phase of the Twin Dancer in one power strike, the Twin Fangs and the Arming Sword in about two.
 Poise drains after 1.6 s without gains, and fast when you back away **(owner)**.
+
+After each opening the next combo follows quickly **(owner)**: the pause before it is a little over half of each
+foe's rest (`COMBO_REST` in `src/data.js`).
 
 Striking an enemy outside its opening is guarded: a little poise for it, more for you, and it may punish.
 
@@ -55,7 +61,7 @@ You have no stamina, only poise **(owner)**: blocks and guarded hits fill it; fu
 Levels and stats **(owner)**: echoes (dropped by enemies) buy levels at beacons. Stats: Vitality (+9 health), Guard
 (blocks fill your poise 4% less), Strength and Finesse (damage scaling), Focus (timing windows 1.5% wider). Die and your
 echoes stay where you fell; reach them to take them back, die first and they are gone. Resting at a beacon heals,
-refills flasks (3, plus one per Lumen Shard) and brings every enemy back. Beacons let you travel between them.
+refills flasks (none to start with: one per Lumen Shard) and brings every enemy back. Beacons let you travel between them.
 
 Swords **(owner)**: each class has block windows per strike and evade windows per move (`src/data.js` WEAPONS):
 
@@ -112,7 +118,7 @@ At the arena door you walk in and stop, and the camera takes over with no cut or
 starts on the very frame you were looking at, then the play area turns away like a stage flat while the neon arena
 comes up around you both. Over about six seconds the camera turns slowly from side-on, keeping you in frame, until it
 is behind you with the warden ahead, and lands on the 1v1 view as in the prototype (A, X or E skips it). Incoming
-strikes fly in from behind the warden as coloured blades showing their path. A lethal strike ends each phase. No music
+strikes fly in from behind the warden as coloured blades showing their path. Each phase ends when its health is gone: power strikes after poise breaks do most of it. No music
 chart: each warden's timing is its own **(owner)**. A/D (or LT with the stick) step left and right.
 
 The Twin Dancer (first written by hand) has three phases. Each later warden gets more health and poise, hits harder,
@@ -127,7 +133,7 @@ Gamepad: the combat buttons are LT step, LB block, RB duck, A jump, X strike **(
 
 You can't push enemies around **(owner)**: they close to their fighting distance and hold their ground, walking into one only stops you, and a FLAWLESS phrase staggers the attacker in place (open, with bonus poise) instead of knocking it back.
 
-A new game opens with a quick tutorial in the Boot Chamber **(owner)**: move, jump, then a harmless training echo throws slashes, sweeps and slams until each is answered twice in a row, a fast pair of sweeps (jump, then block on the way down), and a poise break ending in a lethal strike. Walking past the chamber or Skip in the pause menu ends it.
+A new game opens with a quick tutorial in the Boot Chamber **(owner)**: move, jump, then a harmless training echo throws slashes, sweeps and slams until each is answered twice in a row, a fast pair of sweeps (jump, then block on the way down), and a poise break ending in a power strike. Walking past the chamber or Skip in the pause menu ends it.
 Keyboard: A/D move, W/Space jump, S duck, J block, K strike, L/Shift step, H heal, E interact.
 
 ## Sound

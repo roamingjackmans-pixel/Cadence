@@ -1,6 +1,6 @@
 // The duel with the Twin Dancer, seen from behind you: the prototype's view, restyled and without the music chart.
 import { W, H, clamp, rnd, pick, smooth, wrapA, makeCanvas, bitmapify } from './util.js';
-import { ATTACKS, WEAPONS, BASE_WIN, JUMP_AIR, ACT_NAME, maxHP } from './data.js';
+import { ATTACKS, WEAPONS, BASE_WIN, JUMP_AIR, ACT_NAME, maxHP, swordDmg, powerDmg, COMBO_REST } from './data.js';
 import { Conductor } from './combat.js';
 import { FX, glowSprite } from './fx.js';
 import { input, btn } from './input.js';
@@ -29,7 +29,8 @@ const PP = {
   blockSweep: PV({ hip: [0, -80], chest: [0, -128], head: [0, -164], lS: [-26, -138], rS: [26, -138], lE: [-30, -104], rE: [38, -100], lH: [10, -92], rH: [22, -90], lK: [-28, -40], rK: [28, -40], lF: [-36, 0], rF: [36, 0], sa: 2.35, sl: 1 }),
   // a ninja crouch: one knee nearly down, a hand on the floor
   duck: PV({ hip: [0, -26], chest: [4, -54], head: [8, -78], lS: [-22, -60], rS: [30, -60], lE: [-34, -36], rE: [44, -42], lH: [-30, -8], rH: [26, -44], lK: [-50, -14], rK: [42, -28], lF: [-62, 0], rF: [34, 0], sa: -0.35, sl: 0.8 }),
-  jump: PV({ hip: [0, -100], chest: [0, -148], head: [0, -184], lS: [-26, -158], rS: [26, -158], lE: [-34, -160], rE: [34, -160], lH: [-10, -170], rH: [0, -172], lK: [-24, -70], rK: [24, -66], lF: [-20, -36], rF: [22, -34], sa: -1.9, sl: 0.9 }),
+  // the leap: a little rise, the legs thrown out into the splits, the blade up
+  jump: PV({ hip: [0, -98], chest: [0, -146], head: [0, -182], lS: [-26, -156], rS: [26, -156], lE: [-48, -168], rE: [42, -178], lH: [-72, -186], rH: [34, -206], lK: [-56, -92], rK: [56, -92], lF: [-102, -86], rF: [102, -86], sa: -1.4, sl: 0.9 }),
   sideR: PV({ hip: [0, -88], chest: [14, -136], head: [22, -172], lS: [-12, -146], rS: [38, -144], lE: [-24, -112], rE: [48, -110], lH: [6, -100], rH: [18, -102], lK: [-30, -44], rK: [30, -48], lF: [-50, -4], rF: [40, 0], sa: -0.9, sl: 0.8 }),
   attack: PV({ hip: [0, -90], chest: [-4, -142], head: [-4, -180], lS: [-30, -152], rS: [22, -152], lE: [-40, -176], rE: [10, -180], lH: [-36, -196], rH: [-26, -198], lF: [-36, 0], rF: [26, -4], sa: -2.5, sl: 1 }),
   attackW: PV({ chest: [6, -140], head: [4, -178], lS: [-22, -150], rS: [30, -150], lE: [0, -168], rE: [50, -172], lH: [24, -192], rH: [34, -196], lF: [-34, 0], rF: [34, 0], sa: -0.35, sl: 1 }),
@@ -253,17 +254,17 @@ export class BossFight {
     this.bossPost = this.B.poise; this.mode = 'broken'; this.brokenAt = this.t;
     this.cond.cancelOwner(this, this.t, true); this.openings = [];
     const b = this.bossPos(); this.fx.sparks(b.x, b.y - 150 * b.s, 34, '#ffffff', 750);
-    this.showBanner('POISE BROKEN', btn('attack') + '  Lethal strike', '#ffffff', 1.6); sfx('brk');
+    this.showBanner('POISE BROKEN', btn('attack') + '  Power strike', '#ffffff', 1.6); sfx('brk');
   }
   resolveHit(a) {
     const t = this.t, p = this.player, w = this.w, s = this.g.save;
-    if (this.mode === 'broken') { this.lethal(); return; }
+    if (this.mode === 'broken') { this.power(); return; }
     if (this.mode !== 'play') return;
     const op = this.openings.find((o) => t >= o.start && t <= o.end) || (this.knock && t < this.knock.until);
     const rip = t < p.riposteUntil;
     const b = this.bossPos(), hx = b.x - 10, hy = b.y - 130 * b.s;
     if (op || rip) {
-      const dmg = (w.dmg * (1 + 0.12 * (s.upgrades[s.equipped] || 0)) + w.str * (s.stats.str - 8) * 1.1 + w.fin * (s.stats.fin - 8) * 1.1) * (rip && !op ? 1.4 : 1) * 0.55;
+      const dmg = swordDmg(w, s) * (rip && !op ? 1.4 : 1) * 0.55;
       this.bossHP -= dmg; this.gain(w.poise); this.boss.flinchUntil = t + 0.16;
       this.fx.sparks(hx, hy, 18, '#ffffff', 640); this.fx.sparks(hx, hy, 8, PLAYER_C, 400);
       this.fx.arc(hx + 40, hy + 30, 150 * b.s / 1.2, -2.5, -0.1, PLAYER_C, 0.22, 20);
@@ -284,15 +285,28 @@ export class BossFight {
       this.checkPosture();
     }
   }
-  lethal() {
-    const t = this.t, b = this.bossPos(), hx = b.x, hy = b.y - 130 * b.s;
+  /** The power strike on a broken warden: heavy damage by the sword. Health left and the warden recovers; none and
+   *  the phase ends. */
+  power() {
+    const t = this.t, b = this.bossPos(), hx = b.x, hy = b.y - 130 * b.s, dmg = powerDmg(this.w, this.g.save);
+    this.bossHP -= dmg;
+    this.fx.float(String(Math.round(dmg * 10)), hx + rnd(-30, 30), hy - 110, '#ffffff', 34);
+    if (this.bossHP > 0.5) {
+      this.fx.sparks(hx, hy, 46, '#ffffff', 950); this.fx.cut(hx, hy, -0.6, 380, '#ffffff', 0.32, 10); this.fx.ring(hx, hy, '#ffffff', 180, 0.4, 6);
+      this.flash = { c: '230,255,250', a: 0.3 }; this.shake = 15; this.hitstop = 0.12; this.boss.flinchUntil = t + 0.4; this.boss.recoil = { t0: t, amt: 1.2 };
+      sfx('lethal');
+      this.showBanner('POWER STRIKE', 'Break its poise again to finish the phase', '#ffffff', 1.4);
+      this.mode = 'play'; this.bossPost = 0; this.nextPlan = t + 1;
+      return;
+    }
+    this.bossHP = 0;
     this.fx.sparks(hx, hy, 80, '#ffffff', 1200); this.fx.shards(hx, hy, 30, this.B.look.color, 600, 40);
     this.fx.cut(hx, hy, -0.6, 480, '#ffffff', 0.4, 12); this.fx.ring(hx, hy, '#ffffff', 260, 0.5, 8); this.fx.flare(hx, hy, '#ffffff', 900, 0.4);
     this.flash = { c: '230,255,250', a: 0.55 }; this.shake = 22; this.hitstop = 0.16; this.boss.flinchUntil = t + 0.5;
     sfx('lethal');
     this.phase++;
     if (this.phase >= this.B.phases.length) { this.bossHP = 0; this.end('win'); return; }
-    this.showBanner('LETHAL STRIKE', this.B.lines[this.phase - 1] || '', '#ffffff', 1.8);
+    this.showBanner('POWER STRIKE', this.B.lines[this.phase - 1] || '', '#ffffff', 1.8);
     this.mode = 'play'; this.bossHP = this.B.hp; this.bossPost = 0; this.nextPlan = t + 1.4;
     this.pHP = Math.min(maxHP(this.g.save.stats), this.pHP + 10);
     setIntensity(this.phase);
@@ -323,7 +337,7 @@ export class BossFight {
     const last = notes[notes.length - 1].time;
     const op = { start: last + 0.16, end: last + 0.16 + ph.open, seg: notes[0].seg };
     this.openings.push(op);
-    this.nextPlan = op.end + rnd(ph.rest[0], ph.rest[1]) - this.B.leads[this.phase] * 0.6;
+    this.nextPlan = op.end + rnd(ph.rest[0], ph.rest[1]) * COMBO_REST - this.B.leads[this.phase] * 0.6;
   }
 
   /* ---------- update ---------- */
@@ -413,7 +427,7 @@ export class BossFight {
     if (p.move && t < p.move.until) {
       const m = p.move, k = (t - m.t0) / (m.until - m.t0);
       if (m.kind === 'duck') out = { ...I, pose: PP.duck, rate: 42 };
-      else if (m.kind === 'jump') out = { ...I, pose: PP.jump, y: -Math.sin(k * Math.PI) * 170, rate: 40 };
+      else if (m.kind === 'jump') out = { ...I, pose: k < 0.82 ? PP.jump : PP.idle, y: -Math.sin(k * Math.PI) * 62, rate: k < 0.82 ? 40 : 30 };
       else out = { ...I, pose: m.dir > 0 ? PP.sideR : PP.sideL, x: m.dir * 190 * (k < 0.7 ? 1 : (1 - k) / 0.3), rate: 34 };
     }
     if (t < p.guardUntil) {
@@ -713,6 +727,18 @@ export class BossFight {
       drawRig(ctx, { pose: g.pose, x: PX + g.x - 30, y: PY + g.y, s: PS * g.s, view: 'back', tint: PLAYER_C, alpha: 0.3 * (1 - a), headR: 13, sword: 96 * w.len / 60, bladeW: w.width + 1, twin: w.twin });
       ctx.restore();
     }
+    // the duck and the leap leave a bullet-time trail, as the step does in the side view
+    const m = p.move, tr = m && (m.kind === 'duck' || m.kind === 'jump') && this.t < m.until ? Math.sin(clamp((this.t - m.t0) / (m.until - m.t0), 0, 1) * Math.PI) : 0;
+    if (tr > 0.05) {
+      const g = this.trailPose || (this.trailPose = { ...PP.idle });
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (const k of [0.35, 0.65]) {
+        for (const key in g) g[key] = PP.idle[key];
+        lerp(g, p.pose, k);
+        drawRig(ctx, { pose: g, x: PX + p.x * k, y: PY + p.y * k, s: PS * p.s, view: 'back', tint: PLAYER_C, alpha: 0.32 * tr * (0.4 + k), headR: 13, sword: 96 * w.len / 60, bladeW: w.width + 1, twin: w.twin });
+      }
+      ctx.restore();
+    }
     ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.ellipse(PX + p.x, PY + 4, 58 * p.s, 9 * p.s, 0, 0, 6.283); ctx.fill();
     drawRig(ctx, { pose: p.pose, x: PX + p.x, y: PY + p.y, s: PS * p.s, view: 'back', color: PLAYER_C, rgb: PLAYER_RGB, headR: 13, sword: 96 * w.len / 60, bladeW: w.width + 1.2, twin: w.twin, hot: this.t < p.riposteUntil ? 0.8 : this.t < p.guardUntil ? 0.4 : 0, blade: '#dffcff', bladeGlow: this.t < p.focusUntil ? 0.5 : 0.3 });
     for (const f of this.fx.fx) if (f.k === 'trail') this.drawTrail(ctx, f);
@@ -721,7 +747,7 @@ export class BossFight {
       const age = this.t - this.grade.t0;
       if (age < 0.75) { ctx.globalAlpha = age < 0.5 ? 1 : 1 - (age - 0.5) / 0.25; txt(this.grade.s, PX - 240, 470 - age * 20, 34 * (1 + 0.45 * Math.max(0, 1 - age * 9)), this.grade.c); ctx.globalAlpha = 1; }
     }
-    if (this.mode === 'broken') { const h = this.bossPts.head; txt(btn('attack') + '  LETHAL STRIKE', h.x, h.y - 70, 18, '#ffffff'); }
+    if (this.mode === 'broken') { const h = this.bossPts.head; txt(btn('attack') + '  POWER STRIKE', h.x, h.y - 70, 18, '#ffffff'); }
   }
   /* incoming swings: only the blade, flying in from behind the dancer */
   drawGhosts(ctx) {

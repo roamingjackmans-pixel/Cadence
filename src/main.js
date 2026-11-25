@@ -17,7 +17,7 @@ const ctx = cv.getContext('2d', { alpha: false });
 
 // gates: shortcut gates opened; bosses: zones whose warden is dead; shade: your lost echoes {zone, x, y, amount}
 function freshSave() {
-  return { v: 2, stats: { vit: BASE_STAT, guard: BASE_STAT, str: BASE_STAT, fin: BASE_STAT, focus: BASE_STAT }, echoes: 0, upgrades: { arming: 0 }, equipped: 'arming', flasks: 3, flasksMax: 3, lit: [], beacon: 'b1', taken: [], gates: [], bosses: [], shade: null, hints: true, deaths: 0, kills: 0 };
+  return { v: 2, stats: { vit: BASE_STAT, guard: BASE_STAT, str: BASE_STAT, fin: BASE_STAT, focus: BASE_STAT }, echoes: 0, upgrades: { arming: 0 }, equipped: 'arming', flasks: 0, flasksMax: 0, lit: [], beacon: 'b1', taken: [], gates: [], bosses: [], shade: null, hints: true, deaths: 0, kills: 0 };
 }
 /** A save from before the twelve zones (v1) becomes v2: its gate, its boss, and its echoes if they still lie in the old part of the map. */
 function migrate(s) {

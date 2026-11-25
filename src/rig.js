@@ -8,6 +8,8 @@ export const POSES = {
   run1: P({ chest: [6, -73], head: [9, -89], kF: [16, -28], fF: [24, -6], kB: [-8, -22], fB: [-20, -4], eB: [-12, -60], hB: [-6, -52] }),
   run2: P({ chest: [6, -73], head: [9, -89], kF: [4, -26], fF: [-6, 0], kB: [10, -30], fB: [6, -10], eF: [16, -60], hF: [26, -58] }),
   jump: P({ hip: [0, -52], chest: [2, -78], head: [4, -94], sh: [2, -76], kF: [14, -36], fF: [8, -16], kB: [-2, -32], fB: [-12, -16], eF: [14, -66], hF: [22, -70], eB: [-10, -66], hB: [-4, -72], sa: -1.3 }),
+  // the player's leap: the body barely rises, the legs open into the splits, the blade held high
+  split: P({ hip: [0, -50], chest: [5, -76], head: [9, -92], sh: [5, -74], kF: [24, -51], fF: [48, -49], kB: [-24, -48], fB: [-48, -45], eF: [18, -84], hF: [27, -94], eB: [-10, -82], hB: [-24, -88], sa: -0.8 }),
   fall: P({ hip: [0, -50], kF: [12, -30], fF: [14, -8], kB: [-6, -28], fB: [-14, -6], eB: [-14, -68], hB: [-18, -78], sa: -0.7 }),
   // a ninja crouch: folded low over the front knee, back leg stretched out behind, a hand on the floor,
   // the blade trailing back

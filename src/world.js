@@ -1,6 +1,6 @@
 // The side-scrolling world: movement, enemies, the rhythm combat, beacons, items and death.
 import { W, H, clamp, rnd, pick, sign } from './util.js';
-import { ATTACKS, ENEMIES, WEAPONS, BASE_WIN, DUR, LEAD, ACT_NAME, maxHP } from './data.js';
+import { ATTACKS, ENEMIES, WEAPONS, BASE_WIN, DUR, LEAD, ACT_NAME, maxHP, swordDmg, powerDmg, COMBO_REST } from './data.js';
 import { Conductor } from './combat.js';
 import { T } from './level.js';
 import { buildZone, zoneById, foeDef } from './zones.js';
@@ -167,7 +167,7 @@ export class World {
       if (input.down() && this.onPlatform()) { p.y += 3; p.dropUntil = this.t + 0.2; p.onGround = false; return; }
       // the tall jump is for getting around: in a fight, or within about 15 ft of an enemy, every jump is the small one
       const hop = from === 'hop' || this.nearFoe();
-      p.vy = hop ? -HOP : -JV; p.onGround = false; p.coyote = 0; p.jumpHeld = !hop; p.jumpKey = from === 'padA' ? 'padA' : 'jump'; p.move = null; p.guardUntil = -9; sfx('jump');
+      p.vy = hop ? -HOP : -JV; p.onGround = false; p.coyote = 0; p.jumpHeld = !hop; p.jumpKey = from === 'padA' ? 'padA' : 'jump'; p.jumpT = this.t; p.move = null; p.guardUntil = -9; sfx('jump');
     } else {
       p.move = { kind: a, t0: this.t, until: this.t + DUR[a] };
       p.guardUntil = -9;
@@ -255,7 +255,7 @@ export class World {
     }
     else if (p.move && t < p.move.until) { pose = p.move.kind === 'duck' ? POSES.duck : POSES.dodge; rate = 45; }
     else if (p.heal) { pose = POSES.heal; rate = 14; }
-    else if (!p.onGround) { pose = p.vy < 0 ? POSES.jump : POSES.fall; rate = 16; }
+    else if (!p.onGround) { const leap = t - (p.jumpT ?? -9) < 1.2 && p.vy < 300; pose = leap ? POSES.split : POSES.fall; rate = leap ? 30 : 16; }
     else if (Math.abs(p.vx) > 30) { p.walkPh += dt * Math.abs(p.vx) / 26; pose = Math.sin(p.walkPh) > 0 ? POSES.run1 : POSES.run2; rate = 16; }
     this.poseTo(p, pose, rate, dt);
   }
@@ -317,7 +317,7 @@ export class World {
     // awareness
     if (e.state === 'idle' && !p.dead && dist < 380 && Math.abs(dy) < 110) e.state = 'aggro';
     if (e.state === 'aggro' && (p.dead || dist > 760 || Math.abs(dy) > 260)) { e.state = 'idle'; this.cond.cancelOwner(e, t); e.slot = 0; }
-    // broken: waiting for a lethal strike
+    // broken: waiting for a power strike
     if (e.brokenUntil > t) { e.vx = 0; this.physics(e, dt, false); this.poseTo(e, POSES.broken, 10, dt); return; }
     if (e.brokenUntil && t >= e.brokenUntil) { e.brokenUntil = 0; e.poise = def.poise * 0.6; if (e.hp <= 0) e.hp = def.hp * 0.15; this.fx.float('RECOVERED', e.x, e.y - e.h - 30, '#cfe9e0', 14); }
     // poise drains when you stop pressing, fast when you back away
@@ -349,7 +349,7 @@ export class World {
       });
       if (notes) {
         const last = notes[notes.length - 1].time;
-        e.openStart = last + 0.14; e.openEnd = e.openStart + def.open; e.nextPlan = e.openEnd + rnd(def.rest[0], def.rest[1]) * (twoOn ? 1.3 : 1);
+        e.openStart = last + 0.14; e.openEnd = e.openStart + def.open; e.nextPlan = e.openEnd + rnd(def.rest[0], def.rest[1]) * COMBO_REST * (twoOn ? 1.3 : 1);
       } else e.nextPlan = t + 0.3;
     }
     this.animEnemy(e, dt, striking);
@@ -499,7 +499,7 @@ export class World {
       const e = a.target;
       if (!e || e.dead) return;
       p.face = sign(e.x - p.x);
-      this.killEnemy(e, true);
+      this.powerHit(e);
       return;
     }
     // nearest enemy in front, in reach
@@ -513,11 +513,11 @@ export class World {
     const tipX = p.x + p.face * w.reach * 0.7, tipY = p.y - 44;
     this.fx.arc(p.x + p.face * 10, p.y - 40, w.reach * 0.75, p.face > 0 ? -1.4 : Math.PI + 1.4, p.face > 0 ? 0.6 : Math.PI - 0.6, PLAYER_C, 0.18, 10);
     if (!e) return;
-    if (e.brokenUntil > t) { this.killEnemy(e, true); return; }
+    if (e.brokenUntil > t) { this.powerHit(e); return; }
     const open = (t >= e.openStart - 0.05 && t <= e.openEnd) || e.state !== 'aggro' || t < e.knockUntil;
     const rip = t < p.riposteUntil;
     if (open || rip) {
-      const dmg = (w.dmg * (1 + 0.12 * (s.upgrades[s.equipped] || 0)) + w.str * (s.stats.str - 8) * 1.1 + w.fin * (s.stats.fin - 8) * 1.1) * (rip && !open ? 1.4 : 1) * (e.state !== 'aggro' ? 1.5 : 1);
+      const dmg = swordDmg(w, s) * (rip && !open ? 1.4 : 1) * (e.state !== 'aggro' ? 1.5 : 1);
       e.hp -= dmg; this.gainPoise(e, w.poise); e.flinchT = t;
       if (e.state !== 'aggro') e.state = 'aggro';
       this.fx.sparks(e.x, tipY, 16, '#ffffff', 560); this.fx.sparks(e.x, tipY, 8, PLAYER_C, 400); this.fx.cut(e.x, e.y - e.h * 0.55, p.face > 0 ? -0.7 : 0.7, 90, PLAYER_C, 0.22, 7);
@@ -535,13 +535,24 @@ export class World {
       this.checkBreak(e);
     }
   }
+  /** The power strike on a broken enemy: heavy damage by the sword. It kills, or the enemy staggers and recovers. */
+  powerHit(e) {
+    const t = this.t, p = this.p, dmg = powerDmg(p.weapon, this.g.save);
+    e.hp -= dmg;
+    this.fx.float(String(Math.round(dmg)), e.x + rnd(-20, 20), e.y - e.h - 24, '#ffffff', 22);
+    if (e.hp <= 0.5) { this.killEnemy(e, true); return; }
+    e.brokenUntil = 0; e.poise = 0; e.flinchT = t; e.recoilT = t; e.nextPlan = Math.max(e.nextPlan, t + 0.8);
+    this.fx.flare(e.x, e.y - e.h * 0.55, '#ffffff', 320, 0.3); this.fx.cut(e.x, e.y - e.h * 0.55, -0.6, 200, '#ffffff', 0.32, 8);
+    this.hitstop = 0.1; this.shake = 11; this.flash = { c: '220,255,240', a: 0.2 }; sfx('lethal');
+    this.fx.float('POWER STRIKE', e.x, e.y - e.h - 48, '#ffffff', 15);
+  }
   killEnemy(e, lethal) {
     const t = this.t, s = this.g.save;
     e.dead = true; e.deathT = t; this.cond.cancelOwner(e, t, true); e.slot = 0;
     if (lethal) {
       this.fx.flare(e.x, e.y - e.h * 0.55, '#ffffff', 500, 0.35); this.fx.cut(e.x, e.y - e.h * 0.55, -0.6, 260, '#ffffff', 0.4, 10);
       this.hitstop = 0.14; this.shake = 16; this.flash = { c: '220,255,240', a: 0.35 }; sfx('lethal');
-      this.showBanner('LETHAL STRIKE', '', '#ffffff', 1.1);
+      this.showBanner('POWER STRIKE', '', '#ffffff', 1.1);
     }
     this.fx.shards(e.x, e.y - e.h / 2, 46, ENEMY_C, 520, e.h / 2.5); this.fx.motes(e.x, e.y - e.h / 2, 20, this.th.neon2, 160, 120); sfx('shatter');
     s.echoes += e.def.echoes; s.kills = (s.kills || 0) + 1; this.fx.float('+' + e.def.echoes, e.x, e.y - e.h - 50, this.th.neon, 18);
@@ -777,13 +788,17 @@ export class World {
       const a = 1 - (t - p.ghostT) / 0.3;
       drawFigure(ctx, { pose: p.pose, x: p.x - p.face * 16, y: p.y, s: 0.62, face: p.face, color: PLAYER_C, rgb: PLAYER_RGB, alpha: 0.3 * a, weapon: w });
     }
-    // the lean leaves a bullet-time trail: faint copies of the body between upright and the arch
-    if (lean > 0.05) {
+    // the lean, the duck and the leap leave a bullet-time trail: faint copies of the body between upright and the move,
+    // a little behind it along the way it is going
+    const ducking = p.move && p.move.kind === 'duck' && t < p.move.until ? Math.sin(clamp((t - p.move.t0) / (p.move.until - p.move.t0), 0, 1) * Math.PI) : 0;
+    const leaping = !p.onGround && t - (p.jumpT ?? -9) < 0.45 ? Math.sin(clamp((t - p.jumpT) / 0.45, 0, 1) * Math.PI) : 0;
+    const trail = Math.max(lean, ducking, leaping);
+    if (trail > 0.05) {
       const g = this.leanGhost || (this.leanGhost = copyPose(POSES.idle));
       for (const k of [0.35, 0.65]) {
         for (const key in g) g[key] = POSES.idle[key];
         lerpPose(g, p.pose, k);
-        drawFigure(ctx, { pose: g, x: p.x, y: p.y, s: 0.62, face: p.face, color: PLAYER_C, rgb: PLAYER_RGB, alpha: 0.22 * lean * k, weapon: w });
+        drawFigure(ctx, { pose: g, x: p.x - p.vx * (1 - k) * 0.05, y: p.y - p.vy * (1 - k) * 0.05, s: 0.62, face: p.face, color: PLAYER_C, rgb: PLAYER_RGB, alpha: 0.22 * trail * k, weapon: w });
       }
     }
     const guard = t < p.guardUntil, hot = t < p.riposteUntil ? 0.8 : guard ? 0.4 : 0;
@@ -854,7 +869,7 @@ export class World {
       const x = e.x, y = top - 4, k = 1 + 0.08 * Math.sin(t * 12);
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(glowSprite('#ffffff'), x - 30 * k, y - 30 * k, 60 * k, 60 * k); ctx.restore();
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x, y - 14 * k); ctx.lineTo(x + 14 * k, y); ctx.lineTo(x, y + 14 * k); ctx.lineTo(x - 14 * k, y); ctx.closePath(); ctx.stroke();
-      txt(btn('attack') + '  LETHAL STRIKE', x, y - 28, 13, '#ffffff');
+      txt(btn('attack') + '  POWER STRIKE', x, y - 28, 13, '#ffffff');
     }
   }
 

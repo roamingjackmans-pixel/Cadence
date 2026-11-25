@@ -123,6 +123,14 @@ export const BASE_STAT = 8;
 export const levelOf = (s) => STAT_ORDER.reduce((a, k) => a + s[k], 0) - STAT_ORDER.length * BASE_STAT + 1;
 export const levelCost = (lvl) => Math.floor(90 * Math.pow(1.14, lvl - 1));
 export const maxHP = (s) => 90 + (s.vit - BASE_STAT) * 9;
+/** One cut of the equipped sword: its damage, its reforging and its Strength and Finesse scaling. */
+export const swordDmg = (w, s) => w.dmg * (1 + 0.12 * (s.upgrades[s.equipped] || 0)) + w.str * (s.stats.str - BASE_STAT) * 1.1 + w.fin * (s.stats.fin - BASE_STAT) * 1.1;
+/** The power strike on a broken foe: every cut of a whole swing, times POWER. At the start the Monolith takes a phase
+ *  of the Twin Dancer (120) in one blow, the Twin Fangs in about two, the Arming Sword in two. */
+export const POWER = 4.2;
+/** The pause after an opening before the next combo, as a share of each foe's and warden's rest (owner: shorter). */
+export const COMBO_REST = 0.55;
+export const powerDmg = (w, s) => swordDmg(w, s) * w.hits.length * POWER;
 
 /*
  * Enemies. Phrases are written in strikes: R slash, Y sweep, P slam. An upper-case letter lands one beat after the

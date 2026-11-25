@@ -1,5 +1,5 @@
 // A quick tutorial at the start of a new game, in the Boot Chamber: move, jump, then a training echo that throws one
-// strike type at a time until you answer it twice in a row, a fast pair, and finally a poise break and lethal strike.
+// strike type at a time until you answer it twice in a row, a fast pair, and finally a poise break and power strike.
 // Walk on past the chamber (or pick Skip in the pause menu) to leave it.
 import { ATTACKS, ENEMIES } from './data.js';
 import { input, btn } from './input.js';
@@ -18,7 +18,7 @@ const STEPS = [
   { title: 'SLAM', type: 'slam', force: 'P', need: 2, line: () => btn('dodge') + ' lean out of the way, or ' + btn('block') + ' block it' },
   { title: 'TOO FAST TO BLOCK TWICE', color: '#eafff3', force: 'Yy', beat: 0.44, need: 2,
     line: () => 'Your guard needs a moment. Jump the first sweep with ' + btn('jump') + ', then block the second with ' + btn('block') + ' on the way down.' },
-  { title: 'LETHAL STRIKE', color: '#eafff3', mixed: true,
+  { title: 'POWER STRIKE', color: '#eafff3', mixed: true,
     line: () => 'Every answer fills its poise bar. When it breaks, strike with ' + btn('attack') + '. Back away and the bar drains.' },
   { title: 'THE CIRCUIT IS YOURS', color: '#3dff9a', end: 6,
     line: () => 'Rest at beacons (' + btn('interact') + ') to heal, level up and change swords. ' + (pad() ? 'Back' : 'I') + ' hides the answer hints.' },
