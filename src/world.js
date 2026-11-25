@@ -172,7 +172,7 @@ export class World {
       if (input.down() && this.onPlatform()) { p.y += 3; p.dropUntil = this.t + 0.2; p.onGround = false; return; }
       // the tall jump is for getting around: in a fight, or within about 15 ft of an enemy, every jump is the small one
       const hop = from === 'hop' || this.nearFoe();
-      p.vy = hop ? -HOP : -JV; p.onGround = false; p.coyote = 0; p.jumpHeld = !hop; p.jumpKey = from === 'padA' ? 'padA' : 'jump'; p.jumpT = this.t; p.move = null; p.guardUntil = -9; sfx('jump');
+      p.vy = hop ? -HOP : -JV; p.onGround = false; p.coyote = 0; p.jumpHeld = !hop; p.jumpKey = from === 'padA' ? 'padA' : 'jump'; p.jumpT = this.t; p.jumpHop = hop; p.move = null; p.guardUntil = -9; sfx('jump');
     } else {
       p.move = { kind: a, t0: this.t, until: this.t + DUR[a] };
       p.guardUntil = -9;
@@ -260,7 +260,8 @@ export class World {
     }
     else if (p.move && t < p.move.until) { pose = p.move.kind === 'duck' ? POSES.duck : POSES.dodge; rate = 45; }
     else if (p.heal) { pose = POSES.heal; rate = 14; }
-    else if (!p.onGround) { const leap = t - (p.jumpT ?? -9) < 1.2 && p.vy < 300; pose = leap ? POSES.split : POSES.fall; rate = leap ? 30 : 16; }
+    // the split leap is the combat jump; getting around, it is a plain jump
+    else if (!p.onGround) { const leap = p.jumpHop && t - (p.jumpT ?? -9) < 1.2 && p.vy < 300; pose = leap ? POSES.split : p.vy < 0 ? POSES.jump : POSES.fall; rate = leap ? 30 : 16; }
     else if (Math.abs(p.vx) > 30) { p.walkPh = (p.walkPh + dt * Math.abs(p.vx) * RUN_STRIDES) % 4; pose = runPose(this.runTmp || (this.runTmp = copyPose(POSES.idle)), p.walkPh); rate = 40; }
     this.poseTo(p, pose, rate, dt);
   }
@@ -798,7 +799,7 @@ export class World {
     // the lean, the duck and the leap leave a bullet-time trail: faint copies of the body between upright and the move,
     // a little behind it along the way it is going
     const ducking = p.move && p.move.kind === 'duck' && t < p.move.until ? Math.sin(clamp((t - p.move.t0) / (p.move.until - p.move.t0), 0, 1) * Math.PI) : 0;
-    const leaping = !p.onGround && t - (p.jumpT ?? -9) < 0.45 ? Math.sin(clamp((t - p.jumpT) / 0.45, 0, 1) * Math.PI) : 0;
+    const leaping = p.jumpHop && !p.onGround && t - (p.jumpT ?? -9) < 0.45 ? Math.sin(clamp((t - p.jumpT) / 0.45, 0, 1) * Math.PI) : 0;
     const trail = Math.max(lean, ducking, leaping);
     if (trail > 0.05) {
       const g = this.leanGhost || (this.leanGhost = copyPose(POSES.idle));
