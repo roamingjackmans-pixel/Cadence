@@ -129,6 +129,10 @@ checked to be answerable on its own.
 
 ## Controls
 
+The run is a ninja sprint **(owner: faster, as lively as the step)**: leaned hard forward, the blade trailing low
+behind, four keys blended smoothly at 2.4 strides a second, and a short streak of afterimages at speed. The jump is a split
+leap: a small rise and the legs thrown into the splits, with the step's afterimages; so is the duck.
+
 Gamepad: the combat buttons are LT step, LB block, RB duck, A jump, X strike **(owner)**; Y heals, the left stick moves and aims. A also interacts (beacons, doors) when nothing is attacking you. RT is a small jump, a fixed hop just onto a block, and answers a sweep like any jump **(owner)**. The tall jump is only for getting around: in a fight, or within about 15 ft (155 px) of a living enemy, every jump is the small one **(owner)**. The step is a planted lean back, not a hop **(owner)**.
 
 You can't push enemies around **(owner)**: they close to their fighting distance and hold their ground, walking into one only stops you, and a FLAWLESS phrase staggers the attacker in place (open, with bonus poise) instead of knocking it back.

@@ -40,6 +40,24 @@ export const POSES = {
   broken: P({ hip: [0, -30], chest: [6, -52], head: [12, -64], sh: [6, -50], eF: [12, -32], hF: [14, -16], eB: [0, -34], hB: [2, -18], kF: [14, -18], fF: [18, 0], kB: [-8, -4], fB: [-24, 0], sa: 1.5 }),
 };
 
+/* The player's run: a ninja sprint, leaned hard into it, the blade trailing low behind, the free arm pumping. Four keys
+   (front foot down, passing, back foot down, passing) blended smoothly; the body drops on each footfall and lifts
+   between. */
+const RUN_UP = { hip: [4, -47], chest: [17, -71], head: [26, -84], sh: [17, -69], eF: [5, -57], hF: [-9, -49], sa: Math.PI - 0.32, sl: 1 };
+const runKey = (o, dy) => { const r = P({ ...RUN_UP, ...o }); for (const k of ['hip', 'chest', 'head', 'sh', 'eF', 'hF', 'eB', 'hB']) r[k + 'y'] += dy; return r; };
+export const RUN = [
+  runKey({ kF: [22, -27], fF: [35, -3], kB: [-6, -23], fB: [-24, -9], eB: [26, -60], hB: [36, -68] }, 3),
+  runKey({ kF: [10, -24], fF: [3, 0], kB: [22, -40], fB: [14, -22], eB: [14, -58], hB: [18, -52] }, -3),
+  runKey({ kB: [22, -27], fB: [35, -3], kF: [-6, -23], fF: [-24, -9], eB: [4, -58], hB: [-6, -50] }, 3),
+  runKey({ kB: [10, -24], fB: [3, 0], kF: [22, -40], fF: [14, -22], eB: [14, -58], hB: [18, -52] }, -3),
+];
+/** The run at u (0..4, one stride every 4), written into out. */
+export function runPose(out, u) {
+  const i = Math.floor(u) % 4, a = RUN[i], b = RUN[(i + 1) % 4], k = u - Math.floor(u), e = k * k * (3 - 2 * k);
+  for (const key in a) out[key] = a[key] + (b[key] - a[key]) * e;
+  return out;
+}
+
 /** A block held from another stance (the duck): the body stays put, the arms and blade come up from its shoulders. */
 const ARMS = ['eFx', 'eFy', 'hFx', 'hFy', 'eBx', 'eBy', 'hBx', 'hBy'];
 export function withGuard(base, g) {

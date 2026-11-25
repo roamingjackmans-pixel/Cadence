@@ -5,7 +5,7 @@ import { Conductor } from './combat.js';
 import { T } from './level.js';
 import { buildZone, zoneById, foeDef } from './zones.js';
 import { LevelArt, NEON, NEON2, Z, drawVignette, themeOf } from './render2d.js';
-import { POSES, lerpPose, copyPose, drawFigure } from './rig.js';
+import { POSES, lerpPose, copyPose, drawFigure, runPose } from './rig.js';
 import { FX, glowSprite } from './fx.js';
 import { input, btn } from './input.js';
 import { sfx } from './audio.js';
@@ -16,6 +16,8 @@ const txt = (s, x, y, size, c, align, weight) => txtC(CTX, s, x, y, size, c, ali
 
 const VW = W / Z, VH = H / Z;
 // JV is the full jump (held for height), HOP the small jump on RT: about a tile and a quarter
+// RUN_STRIDES: run keys per pixel moved: 2.4 strides a second at full speed
+const RUN_STRIDES = 4 * 2.4 / 255;
 const RUN = 255, JV = 780, HOP = 440, NEAR_FOE = 155, GRAV = 2600, MAXFALL = 1100, STEP = 1 / 120;
 const wrap = (s, n) => { const out = []; let cur = ''; for (const w of s.split(' ')) { if (cur && (cur + ' ' + w).length > n) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; } if (cur) out.push(cur); return out; };
 const PLAYER_C = '#5ff3ff', PLAYER_RGB = '95,243,255';
@@ -256,7 +258,7 @@ export class World {
     else if (p.move && t < p.move.until) { pose = p.move.kind === 'duck' ? POSES.duck : POSES.dodge; rate = 45; }
     else if (p.heal) { pose = POSES.heal; rate = 14; }
     else if (!p.onGround) { const leap = t - (p.jumpT ?? -9) < 1.2 && p.vy < 300; pose = leap ? POSES.split : POSES.fall; rate = leap ? 30 : 16; }
-    else if (Math.abs(p.vx) > 30) { p.walkPh += dt * Math.abs(p.vx) / 26; pose = Math.sin(p.walkPh) > 0 ? POSES.run1 : POSES.run2; rate = 16; }
+    else if (Math.abs(p.vx) > 30) { p.walkPh = (p.walkPh + dt * Math.abs(p.vx) * RUN_STRIDES) % 4; pose = runPose(this.runTmp || (this.runTmp = copyPose(POSES.idle)), p.walkPh); rate = 40; }
     this.poseTo(p, pose, rate, dt);
   }
   poseTo(o, pose, rate, dt) { lerpPose(o.pose, pose, 1 - Math.exp(-rate * (this.hitstop > 0 ? dt * 0.2 : dt))); }
@@ -634,7 +636,7 @@ export class World {
   stepCut(dt) {
     const p = this.p, c = this.cut, k = this.t - c.t0, A = this.L.arena;
     const targetX = A.x0 + 6 * T;
-    if (p.x < targetX) { p.vx = 120; p.face = 1; p.walkPh += dt * 4.6; this.poseTo(p, Math.sin(p.walkPh) > 0 ? POSES.run1 : POSES.run2, 10, dt); }
+    if (p.x < targetX) { p.vx = 120; p.face = 1; p.walkPh = (p.walkPh + dt * 120 * RUN_STRIDES) % 4; this.poseTo(p, runPose(this.runTmp || (this.runTmp = copyPose(POSES.idle)), p.walkPh), 30, dt); }
     else { p.vx = 0; this.poseTo(p, POSES.idle, 8, dt); }
     this.physics(p, dt, true);
     if (p.x >= targetX && c.stopAt === undefined) c.stopAt = this.t;
@@ -800,6 +802,17 @@ export class World {
         lerpPose(g, p.pose, k);
         drawFigure(ctx, { pose: g, x: p.x - p.vx * (1 - k) * 0.05, y: p.y - p.vy * (1 - k) * 0.05, s: 0.62, face: p.face, color: PLAYER_C, rgb: PLAYER_RGB, alpha: 0.22 * trail * k, weapon: w });
       }
+    }
+    // at a run, faint copies of the last few frames streak out behind, like the step's trail
+    const tr = this.runTrail || (this.runTrail = []);
+    if (Math.abs(p.vx) > 150 && p.onGround && !p.dead && !this.cut && t - (tr.length ? tr[tr.length - 1].t : -9) > 0.03) {
+      const old = tr.length >= 4 ? tr.shift() : { pose: copyPose(p.pose) };
+      Object.assign(old.pose, p.pose); old.x = p.x; old.y = p.y; old.face = p.face; old.t = t; tr.push(old);
+    }
+    for (const g of tr) {
+      const age = (t - g.t) / 0.13;
+      if (age >= 1 || age < 0) continue;
+      drawFigure(ctx, { pose: g.pose, x: g.x, y: g.y, s: 0.62, face: g.face, color: PLAYER_C, rgb: PLAYER_RGB, alpha: 0.26 * (1 - age), weapon: w });
     }
     const guard = t < p.guardUntil, hot = t < p.riposteUntil ? 0.8 : guard ? 0.4 : 0;
     drawFigure(ctx, {
