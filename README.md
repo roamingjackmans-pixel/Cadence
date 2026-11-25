@@ -12,7 +12,7 @@ Every strike is one of three, and each has two answers:
 
 Your guard can't take two strikes closer than a quarter second, so fast pairs make you mix a block with a duck, a
 jump or a step (jump the first sweep, block the second on the way down). Answers fill the enemy's poise; fill it and
-finish it with a power strike, which hits harder the heavier and better your sword. Back away and its poise drains.
+finish it with a power strike, which hits harder the heavier and better your sword. Once an enemy is close enough to strike you are locked in until the fight ends: no running away.
 
 Twelve zones, from the Verdant Circuit to the Heart of the Circuit, each end in a third-person duel with a warden,
 each harder than the last. Beat one and the way on to the next zone opens beyond its arena.

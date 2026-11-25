@@ -101,6 +101,17 @@ export class World {
   }
   lateFor(type) { let m = 0; for (const a of ATTACKS[type].valid) m = Math.max(m, this.win(a, type).good); return m; }
   attackers() { return this.enemies.filter((e) => e.slot !== 0 && !e.dead); }
+  /** (owner) Once an attacker has closed to its striking distance you hold your ground: no running away and no
+   *  shoving out of a strike, only the answers. It lets go when nothing is fighting you any more. */
+  updateEngaged() {
+    const p = this.p, t = this.t;
+    const fighting = (e, extra) => !e.dead && !e.drill && e.state === 'aggro' && !e.leaping && Math.abs(e.y - p.y) < 50 && Math.abs(e.x - p.x) <= e.def.engage + extra;
+    if (p.dead || p.rest || this.cut) { this.engaged = false; return; }
+    if (!this.engaged) this.engaged = p.onGround && this.enemies.some((e) => e.slot && e.onGround && fighting(e, 20));
+    else this.engaged = this.enemies.some((e) => (e.slot || e.brokenUntil > t) && fighting(e, 140));
+  }
+  /** Engaged, your swing reaches whoever is fighting you, whatever the sword. */
+  reachFor(e) { const w = this.p.weapon; return this.engaged && e.state === 'aggro' ? Math.max(w.reach, e.def.engage + 14 - e.w / 2) : w.reach; }
 
   /* ---------- main update ---------- */
   update(dt, presses, nowMs) {
@@ -212,7 +223,8 @@ export class World {
     if (p.atk) speed *= 0.25;
     if (t < p.guardUntil) speed *= 0.3;
     if (p.heal) speed *= 0.3;
-    const target = busy && !(p.heal) ? 0 : ax * speed;
+    this.updateEngaged();
+    const target = (busy && !(p.heal)) || this.engaged ? 0 : ax * speed;
     p.vx += (target - p.vx) * Math.min(1, dt * (p.onGround ? 18 : 7));
     if (ax && !p.atk && t >= p.stunUntil) p.face = sign(ax);
     // variable jump height
@@ -514,7 +526,7 @@ export class World {
     for (const x of this.enemies) {
       if (x.dead || x.state === 'perched' || x.leaping) continue;
       const dx = (x.x - p.x) * p.face;
-      if (dx < -10 || dx > w.reach + x.w / 2 || Math.abs(x.y - p.y) > 60) continue;
+      if (dx < -10 || dx > this.reachFor(x) + x.w / 2 || Math.abs(x.y - p.y) > 60) continue;
       if (!e || Math.abs(x.x - p.x) < Math.abs(e.x - p.x)) e = x;
     }
     const tipX = p.x + p.face * w.reach * 0.7, tipY = p.y - 44;
@@ -674,7 +686,7 @@ export class World {
     for (const e of this.attackers()) {
       const hitAt = t + p.weapon.hits[0];
       const next = pending[0];
-      if (hitAt >= e.openStart && hitAt <= e.openEnd - 0.05 && (!next || next.time - t > 0.5) && t >= p.atkReady && Math.abs(e.x - p.x) < p.weapon.reach + 10) { p.face = sign(e.x - p.x); this.startAttack(); break; }
+      if (hitAt >= e.openStart && hitAt <= e.openEnd - 0.05 && (!next || next.time - t > 0.5) && t >= p.atkReady && Math.abs(e.x - p.x) < this.reachFor(e) + 10) { p.face = sign(e.x - p.x); this.startAttack(); break; }
     }
   }
 

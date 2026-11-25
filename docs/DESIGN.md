@@ -38,6 +38,11 @@ every phrase in so the merged strikes from both sides can always be answered per
 0.2 s, and some sequence of answers exists under the air and fast-pair rules (`survivable`). When it can't fit a
 phrase it slides it later, then softens sweeps and slams into slashes.
 
+Once an attacker closes to its striking distance (its `engage` + 20 px) you are **engaged** and hold your ground:
+no walking away and no shoving out of a strike, only the answers, the jump and the step-aside in place **(owner)**.
+While engaged your swing reaches whoever is fighting you, whatever the sword. It lets go when no attacker (or broken
+enemy) is left within `engage` + 140 px. The tutorial's training echo never engages you, so walking on still skips it.
+
 Block faces the attacker the stick (or A/D) points at; duck, jump and step work against both **(owner)**.
 
 ## Poise and death
@@ -48,7 +53,7 @@ back). Full poise, or no health left, breaks it and opens it to a power strike *
 four times its damage (`powerDmg` in `src/data.js`), so heavier and better swords hit harder. Health left after it and
 the foe staggers and recovers with no poise; none and it dies, or a warden's phase ends. At the start the Monolith
 ends a phase of the Twin Dancer in one power strike, the Twin Fangs and the Arming Sword in about two.
-Poise drains after 1.6 s without gains, and fast when you back away **(owner)**.
+Poise drains after 1.6 s without gains, and fast if the attacker is left more than 70 px past its striking distance **(owner)**.
 
 After each opening the next combo follows quickly **(owner)**: the pause before it is a little over half of each
 foe's rest (`COMBO_REST` in `src/data.js`).

@@ -19,7 +19,7 @@ const STEPS = [
   { title: 'TOO FAST TO BLOCK TWICE', color: '#eafff3', force: 'Yy', beat: 0.44, need: 2,
     line: () => 'Your guard needs a moment. Jump the first sweep with ' + btn('jump') + ', then block the second with ' + btn('block') + ' on the way down.' },
   { title: 'POWER STRIKE', color: '#eafff3', mixed: true,
-    line: () => 'Every answer fills its poise bar. When it breaks, strike with ' + btn('attack') + '. Back away and the bar drains.' },
+    line: () => 'Every answer fills its poise bar. When it breaks, strike with ' + btn('attack') + '. Let up and the bar drains.' },
   { title: 'THE CIRCUIT IS YOURS', color: '#3dff9a', end: 6,
     line: () => 'Rest at beacons (' + btn('interact') + ') to heal, level up and change swords. ' + (pad() ? 'Back' : 'I') + ' hides the answer hints.' },
 ];
